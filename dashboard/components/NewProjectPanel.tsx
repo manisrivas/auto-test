@@ -7,17 +7,16 @@ import { connectRepo, createProject, storeGitHubToken, githubSignin, GitHubRepo,
 
 interface Props {
   token: string;
+  email: string;
   onCreated: (project: Project) => void;
   onCancel: () => void;
 }
 
-export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
+export default function NewProjectPanel({ token, email, onCreated, onCancel }: Props) {
   const { data: session } = useSession();
   const githubToken = (session as { githubToken?: string })?.githubToken ?? "";
   const githubUsername = (session as { githubUsername?: string })?.githubUsername ?? "";
 
-  const email = session?.user?.email ?? "";
-  const [backendToken, setBackendToken] = useState(token);
   const [tab, setTab] = useState<"github" | "manual">("github");
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [reposLoading, setReposLoading] = useState(false);
@@ -32,7 +31,6 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
     if (tab !== "github" || !githubToken) return;
     setReposLoading(true);
     setReposError("");
-    // Fetch repos directly from GitHub API — no backend token needed
     fetch("https://api.github.com/user/repos?per_page=100&sort=updated&type=all", {
       headers: {
         Authorization: `Bearer ${githubToken}`,
@@ -56,19 +54,19 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
       .finally(() => setReposLoading(false));
   }, [tab, githubToken]);
 
+  // Resolve backend token — use prop if available, otherwise call githubSignin
+  async function getToken(): Promise<string> {
+    if (token) return token;
+    if (!email) throw new Error("Not authenticated");
+    const data = await githubSignin(email);
+    return data.token;
+  }
+
   async function handleConnect(repo: GitHubRepo) {
     setConnecting(repo.full_name);
+    setReposError("");
     try {
-      // If backend token is missing (GitHub OAuth didn't create backend account yet), do it now
-      let activeToken = backendToken;
-      if (!activeToken && email) {
-        const data = await githubSignin(email);
-        activeToken = data.token;
-        setBackendToken(data.token);
-      }
-      if (!activeToken) throw new Error("Not authenticated — please log in again");
-
-      // Store GitHub token in backend so webhook/API calls work
+      const activeToken = await getToken();
       if (githubToken) {
         await storeGitHubToken(githubToken, githubUsername, activeToken).catch(() => {});
       }
@@ -92,13 +90,7 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
     setCreating(true);
     setManualError("");
     try {
-      let activeToken = backendToken;
-      if (!activeToken && email) {
-        const data = await githubSignin(email);
-        activeToken = data.token;
-        setBackendToken(data.token);
-      }
-      if (!activeToken) throw new Error("Not authenticated — please log in again");
+      const activeToken = await getToken();
       const p = await createProject(name.trim(), 80, activeToken);
       onCreated(p);
     } catch (e: unknown) {
@@ -114,13 +106,11 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
 
   return (
     <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.09)", borderRadius: 16, overflow: "hidden" }}>
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
         <h2 style={{ fontSize: 15, fontWeight: 500, color: "#0a0a0a", letterSpacing: "-0.3px" }}>Add a project</h2>
         <button onClick={onCancel} style={{ background: "none", border: "none", color: "#8a8a8a", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
         {([["github", "Import from GitHub"], ["manual", "Create manually"]] as const).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", borderBottom: tab === t ? "2px solid #0a0a0a" : "2px solid transparent", fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#0a0a0a" : "#8a8a8a", cursor: "pointer", marginBottom: -1 }}>
@@ -131,8 +121,6 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
       </div>
 
       <div style={{ padding: 24 }}>
-
-        {/* ── GitHub tab ── */}
         {tab === "github" && (
           !githubToken ? (
             <div style={{ textAlign: "center", padding: "32px 0" }}>
@@ -153,8 +141,8 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
             </div>
           ) : reposLoading ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} style={{ background: "#f5f5f2", borderRadius: 12, height: 88, animation: "pulse 1.5s ease-in-out infinite" }} />
+              {[1,2,3,4,5,6].map((i) => (
+                <div key={i} style={{ background: "#f5f5f2", borderRadius: 12, height: 88 }} />
               ))}
             </div>
           ) : (
@@ -162,8 +150,6 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
               {reposError && (
                 <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 8, padding: "8px 12px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", marginBottom: 14 }}>{reposError}</div>
               )}
-
-              {/* Search */}
               <div style={{ position: "relative", marginBottom: 16 }}>
                 <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#8a8a8a" }} />
                 <input
@@ -173,19 +159,14 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
                   style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, padding: "8px 12px 8px 32px", fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#0a0a0a", background: "#fafaf8", outline: "none" }}
                 />
               </div>
-
-              {/* Repo cards grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, maxHeight: 360, overflowY: "auto" }}>
                 {filtered.length === 0 ? (
                   <div style={{ gridColumn: "1/-1", padding: "24px", textAlign: "center", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a" }}>No repositories found</div>
                 ) : filtered.map((repo) => (
-                  <div
-                    key={repo.id}
-                    style={{ background: "#fafaf8", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", gap: 10, transition: "border-color 0.15s, box-shadow 0.15s" }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.18)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.08)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
+                  <div key={repo.id} style={{ background: "#fafaf8", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.18)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.08)"; }}
                   >
-                    {/* Top row */}
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                       <i className="ti ti-git-branch" style={{ fontSize: 14, color: "#8a8a8a", marginTop: 1, flexShrink: 0 }} />
                       <div style={{ minWidth: 0 }}>
@@ -193,22 +174,12 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
                         <div style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#8a8a8a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{repo.full_name}</div>
                       </div>
                     </div>
-
-                    {/* Tags */}
                     <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                      {repo.language && (
-                        <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#3a3a3a", background: "#ebebeb", borderRadius: 4, padding: "2px 6px" }}>{repo.language}</span>
-                      )}
-                      {repo.private && (
-                        <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#b45309", background: "#fef8ee", border: "1px solid rgba(180,83,9,0.2)", borderRadius: 4, padding: "2px 6px" }}>private</span>
-                      )}
+                      {repo.language && <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#3a3a3a", background: "#ebebeb", borderRadius: 4, padding: "2px 6px" }}>{repo.language}</span>}
+                      {repo.private && <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#b45309", background: "#fef8ee", border: "1px solid rgba(180,83,9,0.2)", borderRadius: 4, padding: "2px 6px" }}>private</span>}
                     </div>
-
-                    {/* Action */}
                     {repo.connected ? (
-                      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#1a7a4a", background: "#edf7f1", border: "1px solid rgba(46,168,101,0.2)", borderRadius: 6, padding: "5px 0", textAlign: "center" }}>
-                        ✓ Connected
-                      </span>
+                      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#1a7a4a", background: "#edf7f1", border: "1px solid rgba(46,168,101,0.2)", borderRadius: 6, padding: "5px 0", textAlign: "center" }}>✓ Connected</span>
                     ) : (
                       <button
                         onClick={() => handleConnect(repo)}
@@ -221,7 +192,6 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
                   </div>
                 ))}
               </div>
-
               <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", marginTop: 12 }}>
                 Signed in as <strong>{githubUsername}</strong> · {repos.length} repositories
               </div>
@@ -229,15 +199,12 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
           )
         )}
 
-        {/* ── Manual tab ── */}
         {tab === "manual" && (
           <form onSubmit={handleManualCreate} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={{ display: "block", fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", letterSpacing: "0.5px", marginBottom: 6 }}>PROJECT NAME</label>
               <input
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                autoFocus value={name} onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. my-api, frontend, payments-service"
                 style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, padding: "9px 12px", fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#0a0a0a", background: "#fafaf8", outline: "none" }}
               />

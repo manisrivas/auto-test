@@ -3,12 +3,12 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getProjects, Project } from "@/lib/api";
+import { getProjects, githubSignin, Project } from "@/lib/api";
 import SetupGuide from "@/components/SetupGuide";
 import NewProjectPanel from "@/components/NewProjectPanel";
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,15 +16,46 @@ export default function DashboardPage() {
   const [showPanel, setShowPanel] = useState(false);
   const [newProject, setNewProject] = useState<Project | null>(null);
 
-  const token = (session as { token?: string })?.token ?? "";
+  const rawToken = (session as { token?: string })?.token ?? "";
+  const email = session?.user?.email ?? "";
 
   useEffect(() => {
-    if (!token) return;
-    getProjects(token)
-      .then(setProjects)
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [token]);
+    if (status === "loading") return;
+    if (status === "unauthenticated") { router.push("/login"); return; }
+
+    // If session exists but no backend token (GitHub OAuth — backend call may have failed)
+    // Try to get the backend token now using their email
+    async function load() {
+      let token = rawToken;
+
+      if (!token && email) {
+        try {
+          const data = await githubSignin(email);
+          token = data.token;
+          // Trigger session refresh so token persists
+          await update({ token: data.token, plan: data.plan });
+        } catch {
+          setError("Could not authenticate with backend. Please try logging in again.");
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!token) { setLoading(false); return; }
+
+      try {
+        const list = await getProjects(token);
+        setProjects(list);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to load projects");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, rawToken]);
 
   function handleCreated(p: Project) {
     setProjects((prev) => [...prev, p]);
@@ -32,14 +63,15 @@ export default function DashboardPage() {
     setNewProject(p);
   }
 
+  const token = rawToken;
+
   return (
     <>
-      {/* Topbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 32px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
         <div>
           <h1 style={{ fontSize: 19, fontWeight: 500, letterSpacing: "-0.5px", color: "#0a0a0a" }}>Projects</h1>
           <p style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a", marginTop: 2 }}>
-            {projects.length} project{projects.length !== 1 ? "s" : ""} · {session?.user?.email}
+            {projects.length} project{projects.length !== 1 ? "s" : ""} · {email}
           </p>
         </div>
         <button
@@ -52,21 +84,18 @@ export default function DashboardPage() {
 
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
         {error && (
-          <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 10, padding: "10px 14px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b" }}>
-            {error}
-          </div>
+          <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 10, padding: "10px 14px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b" }}>{error}</div>
         )}
 
-        {/* Add project panel — GitHub import or manual */}
         {showPanel && (
           <NewProjectPanel
             token={token}
+            email={email}
             onCreated={handleCreated}
             onCancel={() => setShowPanel(false)}
           />
         )}
 
-        {/* Setup guide — shown immediately after project is created/imported */}
         {newProject && (
           <SetupGuide
             projectKey={newProject.project_key}

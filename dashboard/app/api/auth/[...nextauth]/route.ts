@@ -29,38 +29,41 @@ const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user, account, profile }) {
-      // Credentials sign-in
+      // Credentials sign-in — store backend JWT directly
       if (user && account?.provider === "credentials") {
         token.token = (user as { token?: string }).token;
         token.plan = (user as { plan?: string }).plan ?? "free";
       }
 
-      // GitHub sign-in — create/find backend account and store GitHub token
+      // GitHub sign-in — capture GitHub token and username
       if (account?.provider === "github" && account.access_token) {
         token.githubToken = account.access_token;
         token.githubUsername = (profile as { login?: string })?.login ?? "";
+        // Store email from GitHub profile so we can use it later
+        const ghEmail = (profile as { email?: string })?.email;
+        if (ghEmail) token.email = ghEmail;
+      }
 
-        // Auto-create or find their backend account using GitHub email
-        const email = token.email ?? (profile as { email?: string })?.email ?? "";
-        if (email) {
-          try {
-            const data = await githubSignin(email);
-            token.token = data.token;
-            token.plan = data.plan;
-          } catch {
-            // Non-fatal — dashboard API calls will fail gracefully
-          }
+      // Always ensure backend token exists — retry every time if missing
+      // This covers: initial GitHub sign-in failure, session refresh, etc.
+      if (!token.token && token.email) {
+        try {
+          const data = await githubSignin(String(token.email));
+          token.token = data.token;
+          token.plan = data.plan;
+        } catch {
+          // Backend unreachable — will retry on next request
         }
       }
 
       return token;
     },
     async session({ session, token }) {
-      (session as { token?: string }).token = token.token as string;
-      (session as { githubToken?: string }).githubToken = token.githubToken as string;
-      (session as { githubUsername?: string }).githubUsername = token.githubUsername as string;
+      (session as { token?: string }).token = token.token as string | undefined;
+      (session as { githubToken?: string }).githubToken = token.githubToken as string | undefined;
+      (session as { githubUsername?: string }).githubUsername = token.githubUsername as string | undefined;
       if (session.user) {
-        (session.user as { plan?: string }).plan = token.plan as string;
+        (session.user as { plan?: string }).plan = (token.plan as string) ?? "free";
       }
       return session;
     },

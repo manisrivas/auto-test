@@ -1,7 +1,7 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
-import { login } from "@/lib/api";
+import { login, githubSignin } from "@/lib/api";
 
 const authOptions: NextAuthOptions = {
   providers: [
@@ -28,16 +28,31 @@ const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.token = (user as { token?: string }).token ?? token.sub;
+    async jwt({ token, user, account, profile }) {
+      // Credentials sign-in
+      if (user && account?.provider === "credentials") {
+        token.token = (user as { token?: string }).token;
         token.plan = (user as { plan?: string }).plan ?? "free";
       }
-      // Store GitHub access token when signing in with GitHub
+
+      // GitHub sign-in — create/find backend account and store GitHub token
       if (account?.provider === "github" && account.access_token) {
         token.githubToken = account.access_token;
-        token.githubUsername = (token as { login?: string }).login ?? "";
+        token.githubUsername = (profile as { login?: string })?.login ?? "";
+
+        // Auto-create or find their backend account using GitHub email
+        const email = token.email ?? (profile as { email?: string })?.email ?? "";
+        if (email) {
+          try {
+            const data = await githubSignin(email);
+            token.token = data.token;
+            token.plan = data.plan;
+          } catch {
+            // Non-fatal — dashboard API calls will fail gracefully
+          }
+        }
       }
+
       return token;
     },
     async session({ session, token }) {

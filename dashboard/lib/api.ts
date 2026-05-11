@@ -44,7 +44,7 @@ export function register(email: string, password: string): Promise<AuthResponse>
 export function githubSignin(email: string): Promise<AuthResponse> {
   return request<AuthResponse>("/auth/github-signin", {
     method: "POST",
-    body: JSON.stringify({ email, password: "" }),
+    body: JSON.stringify({ email }),
   });
 }
 

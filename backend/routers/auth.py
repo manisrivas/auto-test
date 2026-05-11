@@ -102,12 +102,16 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> AuthResponse:
     return AuthResponse(token=_create_token(str(user.id)), email=user.email, plan=user.plan)
 
 
+class GitHubSigninRequest(BaseModel):
+    email: EmailStr
+
+
 @router.post("/github-signin", response_model=AuthResponse)
-def github_signin(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
+def github_signin(body: GitHubSigninRequest, db: Session = Depends(get_db)) -> AuthResponse:
     """Find or create a user account for GitHub OAuth sign-in (no password needed)."""
+    import secrets as _secrets
     user = db.query(User).filter(User.email == body.email).first()
     if user is None:
-        import secrets as _secrets
         user = User(
             email=body.email,
             password_hash=_hash_password(_secrets.token_urlsafe(32)),

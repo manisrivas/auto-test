@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { token, email, githubUsername } = useAuth();
+  const { token, email, githubUsername, ready } = useAuth();
   const router = useRouter();
   const plan = (session?.user as { plan?: string })?.plan ?? "free";
   const githubConnected = !!githubUsername;
@@ -19,11 +19,11 @@ export default function SettingsPage() {
 
   async function handleDisconnect() {
     if (!confirm("Disconnect GitHub? Your connected repos will still exist as projects but webhooks will stop working.")) return;
+    if (!token) { setDisconnectError("Still loading auth — please wait a moment and try again."); return; }
     setDisconnecting(true);
     setDisconnectError("");
     try {
       await disconnectGitHub(token);
-      // Sign out and back in so session reflects the change
       await signOut({ callbackUrl: "/login" });
     } catch (e: unknown) {
       setDisconnectError(e instanceof Error ? e.message : "Failed to disconnect");
@@ -80,10 +80,10 @@ export default function SettingsPage() {
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                   <button
                     onClick={handleDisconnect}
-                    disabled={disconnecting}
-                    style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", background: "none", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", opacity: disconnecting ? 0.5 : 1 }}
+                    disabled={disconnecting || !ready || !token}
+                    style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", background: "none", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", opacity: (disconnecting || !ready || !token) ? 0.4 : 1 }}
                   >
-                    {disconnecting ? "Disconnecting…" : "Disconnect GitHub"}
+                    {!ready ? "Loading…" : disconnecting ? "Disconnecting…" : "Disconnect GitHub"}
                   </button>
                   {disconnectError && <span style={{ fontSize: 10, color: "#c0392b", fontFamily: "DM Mono, monospace" }}>{disconnectError}</span>}
                 </div>

@@ -87,11 +87,22 @@ export default function ProjectDetailPage() {
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
         {/* Top row: 2×2 KPI cards (60%) + Setup guide (40%) */}
         <div style={{ display: "grid", gridTemplateColumns: data.recent_pushes.length === 0 && projectKey ? "3fr 2fr" : "1fr", gap: 20, alignItems: "start" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
             <KpiCard label="Coverage" value={`${data.coverage.current}%`}
               delta={`${data.coverage.trend === "up" ? "+" : ""}${data.coverage.current - data.coverage.previous}% vs prev`}
               deltaUp={data.coverage.trend === "up" ? true : data.coverage.trend === "down" ? false : undefined}
               barPct={data.coverage.current} barColor="#0a0a0a" />
+            <KpiCard label="Pass rate"
+              value={data.recent_pushes.length === 0 ? "—" : `${Math.round(data.recent_pushes.filter(p => p.status === "passed").length / data.recent_pushes.length * 100)}%`}
+              delta={`${data.recent_pushes.filter(p => p.status === "passed").length} of ${data.recent_pushes.length} pushes`}
+              deltaUp={data.recent_pushes.length > 0 && data.recent_pushes.filter(p => p.status === "passed").length / data.recent_pushes.length >= 0.8 ? true : data.recent_pushes.length > 0 ? false : undefined}
+              barPct={data.recent_pushes.length > 0 ? Math.round(data.recent_pushes.filter(p => p.status === "passed").length / data.recent_pushes.length * 100) : 0}
+              barColor="#2ea865" />
+            <KpiCard label="Quality issues"
+              value={String(data.quality_checks?.length ?? 0)}
+              delta={`${data.quality_checks?.filter(c => c.severity === "error").length ?? 0} errors · ${data.quality_checks?.filter(c => c.severity === "warning").length ?? 0} warnings`}
+              deltaUp={data.quality_checks?.length === 0 ? true : (data.quality_checks?.filter(c => c.severity === "error").length ?? 0) > 0 ? false : undefined}
+              barPct={Math.min((data.quality_checks?.length ?? 0) * 5, 100)} barColor="#d4820a" />
             <KpiCard label="Tests passed" value={String(data.recent_pushes.reduce((s, p) => s + (p.status === "passed" ? 1 : 0), 0))}
               delta="recent pushes" barPct={75} barColor="#2ea865" />
             <KpiCard label="Failures" value={String(data.recent_pushes.filter(p => p.status === "failed").length)}

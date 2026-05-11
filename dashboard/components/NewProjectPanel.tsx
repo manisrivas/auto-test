@@ -3,14 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
-import {
-  getGitHubRepos,
-  connectRepo,
-  createProject,
-  storeGitHubToken,
-  GitHubRepo,
-  Project,
-} from "@/lib/api";
+import { connectRepo, createProject, storeGitHubToken, GitHubRepo, Project } from "@/lib/api";
 
 interface Props {
   token: string;
@@ -24,34 +17,52 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
   const githubUsername = (session as { githubUsername?: string })?.githubUsername ?? "";
 
   const [tab, setTab] = useState<"github" | "manual">("github");
-
-  // GitHub tab state
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [reposLoading, setReposLoading] = useState(false);
   const [reposError, setReposError] = useState("");
   const [search, setSearch] = useState("");
   const [connecting, setConnecting] = useState<string | null>(null);
-
-  // Manual tab state
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [manualError, setManualError] = useState("");
 
   useEffect(() => {
-    if (tab !== "github" || !githubToken || !token) return;
+    if (tab !== "github" || !githubToken) return;
     setReposLoading(true);
     setReposError("");
-    storeGitHubToken(githubToken, githubUsername, token)
-      .then(() => getGitHubRepos(token))
-      .then(setRepos)
-      .catch(() => setReposError("Failed to load repositories"))
+    // Fetch repos directly from GitHub API — no backend token needed
+    fetch("https://api.github.com/user/repos?per_page=100&sort=updated&type=all", {
+      headers: {
+        Authorization: `Bearer ${githubToken}`,
+        Accept: "application/vnd.github+json",
+      },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!Array.isArray(data)) throw new Error(data.message ?? "GitHub API error");
+        setRepos(data.map((r: Record<string, unknown>) => ({
+          id: r.id as number,
+          full_name: r.full_name as string,
+          name: r.name as string,
+          private: r.private as boolean,
+          language: r.language as string | null,
+          updated_at: r.updated_at as string,
+          connected: false,
+        })));
+      })
+      .catch((e) => setReposError(e.message ?? "Failed to load repositories"))
       .finally(() => setReposLoading(false));
-  }, [tab, githubToken, githubUsername, token]);
+  }, [tab, githubToken]);
 
   async function handleConnect(repo: GitHubRepo) {
     setConnecting(repo.full_name);
     try {
+      // Store GitHub token in backend first so webhook/API calls work
+      if (token && githubToken) {
+        await storeGitHubToken(githubToken, githubUsername, token).catch(() => {});
+      }
       const result = await connectRepo(repo.full_name, repo.name, token);
+      setRepos((prev) => prev.map((r) => r.full_name === repo.full_name ? { ...r, connected: true } : r));
       onCreated({
         id: result.project_id,
         name: repo.name,
@@ -59,8 +70,7 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
         quality_gate_threshold: 80,
       });
     } catch (e: unknown) {
-      setReposError(e instanceof Error ? e.message : "Failed to connect");
-    } finally {
+      setReposError(e instanceof Error ? e.message : "Failed to connect repo");
       setConnecting(null);
     }
   }
@@ -89,110 +99,116 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 24px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
         <h2 style={{ fontSize: 15, fontWeight: 500, color: "#0a0a0a", letterSpacing: "-0.3px" }}>Add a project</h2>
-        <button onClick={onCancel} style={{ background: "none", border: "none", color: "#8a8a8a", cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 2px" }}>×</button>
+        <button onClick={onCancel} style={{ background: "none", border: "none", color: "#8a8a8a", cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
       </div>
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
         {([["github", "Import from GitHub"], ["manual", "Create manually"]] as const).map(([t, label]) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              flex: 1, padding: "12px 0", background: "none", border: "none", borderBottom: tab === t ? "2px solid #0a0a0a" : "2px solid transparent",
-              fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: tab === t ? 600 : 400,
-              color: tab === t ? "#0a0a0a" : "#8a8a8a", cursor: "pointer", marginBottom: -1,
-            }}
-          >
-            {t === "github" && <i className="ti ti-brand-github" style={{ marginRight: 6, fontSize: 13 }} />}
-            {t === "manual" && <i className="ti ti-pencil" style={{ marginRight: 6, fontSize: 13 }} />}
+          <button key={t} onClick={() => setTab(t)} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", borderBottom: tab === t ? "2px solid #0a0a0a" : "2px solid transparent", fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: tab === t ? 600 : 400, color: tab === t ? "#0a0a0a" : "#8a8a8a", cursor: "pointer", marginBottom: -1 }}>
+            <i className={`ti ${t === "github" ? "ti-brand-github" : "ti-pencil"}`} style={{ marginRight: 6, fontSize: 13 }} />
             {label}
           </button>
         ))}
       </div>
 
       <div style={{ padding: 24 }}>
+
         {/* ── GitHub tab ── */}
         {tab === "github" && (
-          <>
-            {!githubToken ? (
-              /* Not connected — prompt OAuth */
-              <div style={{ textAlign: "center", padding: "32px 0" }}>
-                <div style={{ width: 48, height: 48, background: "#0a0a0a", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                  <i className="ti ti-brand-github" style={{ fontSize: 24, color: "#fff" }} />
-                </div>
-                <p style={{ fontSize: 14, fontWeight: 500, color: "#0a0a0a", marginBottom: 6 }}>Connect your GitHub account</p>
-                <p style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a", marginBottom: 24, lineHeight: 1.7 }}>
-                  Sign in with GitHub to see your repositories<br />and import them with one click.
-                </p>
-                <button
-                  onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#0a0a0a", color: "#fff", borderRadius: 8, padding: "10px 24px", fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer" }}
-                >
-                  <i className="ti ti-brand-github" style={{ fontSize: 15 }} />
-                  Sign in with GitHub
-                </button>
+          !githubToken ? (
+            <div style={{ textAlign: "center", padding: "32px 0" }}>
+              <div style={{ width: 48, height: 48, background: "#0a0a0a", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                <i className="ti ti-brand-github" style={{ fontSize: 24, color: "#fff" }} />
               </div>
-            ) : reposLoading ? (
-              <div style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#8a8a8a", padding: "24px 0" }}>Loading repositories…</div>
-            ) : (
-              <>
-                {reposError && (
-                  <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 8, padding: "8px 12px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", marginBottom: 14 }}>{reposError}</div>
-                )}
-                {/* Search */}
-                <div style={{ position: "relative", marginBottom: 14 }}>
-                  <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#8a8a8a" }} />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search repositories…"
-                    style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, padding: "8px 12px 8px 32px", fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#0a0a0a", background: "#fafaf8", outline: "none" }}
-                  />
-                </div>
+              <p style={{ fontSize: 14, fontWeight: 500, color: "#0a0a0a", marginBottom: 6 }}>Connect your GitHub account</p>
+              <p style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a", marginBottom: 24, lineHeight: 1.7 }}>
+                Sign in with GitHub to see your repositories<br />and import them with one click.
+              </p>
+              <button
+                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#0a0a0a", color: "#fff", borderRadius: 8, padding: "10px 24px", fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer" }}
+              >
+                <i className="ti ti-brand-github" style={{ fontSize: 15 }} />
+                Sign in with GitHub
+              </button>
+            </div>
+          ) : reposLoading ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} style={{ background: "#f5f5f2", borderRadius: 12, height: 88, animation: "pulse 1.5s ease-in-out infinite" }} />
+              ))}
+            </div>
+          ) : (
+            <>
+              {reposError && (
+                <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 8, padding: "8px 12px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", marginBottom: 14 }}>{reposError}</div>
+              )}
 
-                {/* Repo list */}
-                <div style={{ border: "1px solid rgba(0,0,0,0.07)", borderRadius: 12, overflow: "hidden", maxHeight: 340, overflowY: "auto" }}>
-                  {filtered.length === 0 ? (
-                    <div style={{ padding: "24px", textAlign: "center", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a" }}>No repositories found</div>
-                  ) : filtered.map((repo, i) => (
-                    <div
-                      key={repo.id}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: i < filtered.length - 1 ? "1px solid rgba(0,0,0,0.05)" : "none", background: "#fff" }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                        <i className="ti ti-git-branch" style={{ fontSize: 15, color: "#8a8a8a", flexShrink: 0 }} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{repo.full_name}</div>
-                          <div style={{ display: "flex", gap: 6, marginTop: 2, alignItems: "center" }}>
-                            {repo.language && <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a" }}>{repo.language}</span>}
-                            {repo.private && <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#b45309", background: "#fef8ee", border: "1px solid rgba(180,83,9,0.2)", borderRadius: 4, padding: "1px 5px" }}>private</span>}
-                          </div>
-                        </div>
+              {/* Search */}
+              <div style={{ position: "relative", marginBottom: 16 }}>
+                <i className="ti ti-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 14, color: "#8a8a8a" }} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`Search ${repos.length} repositories…`}
+                  style={{ width: "100%", boxSizing: "border-box", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, padding: "8px 12px 8px 32px", fontFamily: "DM Sans, sans-serif", fontSize: 13, color: "#0a0a0a", background: "#fafaf8", outline: "none" }}
+                />
+              </div>
+
+              {/* Repo cards grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10, maxHeight: 360, overflowY: "auto" }}>
+                {filtered.length === 0 ? (
+                  <div style={{ gridColumn: "1/-1", padding: "24px", textAlign: "center", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a" }}>No repositories found</div>
+                ) : filtered.map((repo) => (
+                  <div
+                    key={repo.id}
+                    style={{ background: "#fafaf8", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, padding: "14px", display: "flex", flexDirection: "column", gap: 10, transition: "border-color 0.15s, box-shadow 0.15s" }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.18)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.08)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
+                  >
+                    {/* Top row */}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                      <i className="ti ti-git-branch" style={{ fontSize: 14, color: "#8a8a8a", marginTop: 1, flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: "#0a0a0a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{repo.name}</div>
+                        <div style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#8a8a8a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{repo.full_name}</div>
                       </div>
+                    </div>
 
-                      {repo.connected ? (
-                        <span style={{ flexShrink: 0, fontFamily: "DM Mono, monospace", fontSize: 10, color: "#1a7a4a", background: "#edf7f1", border: "1px solid rgba(46,168,101,0.2)", borderRadius: 6, padding: "4px 10px" }}>
-                          Connected
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleConnect(repo)}
-                          disabled={connecting === repo.full_name}
-                          style={{ flexShrink: 0, fontFamily: "DM Mono, monospace", fontSize: 11, color: "#fff", background: "#0a0a0a", border: "none", borderRadius: 6, padding: "6px 14px", cursor: "pointer", opacity: connecting === repo.full_name ? 0.5 : 1 }}
-                        >
-                          {connecting === repo.full_name ? "Adding…" : "Add"}
-                        </button>
+                    {/* Tags */}
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {repo.language && (
+                        <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#3a3a3a", background: "#ebebeb", borderRadius: 4, padding: "2px 6px" }}>{repo.language}</span>
+                      )}
+                      {repo.private && (
+                        <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: "#b45309", background: "#fef8ee", border: "1px solid rgba(180,83,9,0.2)", borderRadius: 4, padding: "2px 6px" }}>private</span>
                       )}
                     </div>
-                  ))}
-                </div>
-                <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", marginTop: 10 }}>
-                  {repos.length} repositories · signed in as <strong>{githubUsername}</strong>
-                </div>
-              </>
-            )}
-          </>
+
+                    {/* Action */}
+                    {repo.connected ? (
+                      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#1a7a4a", background: "#edf7f1", border: "1px solid rgba(46,168,101,0.2)", borderRadius: 6, padding: "5px 0", textAlign: "center" }}>
+                        ✓ Connected
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleConnect(repo)}
+                        disabled={connecting === repo.full_name}
+                        style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, fontWeight: 500, color: "#fff", background: "#0a0a0a", border: "none", borderRadius: 6, padding: "6px 0", cursor: "pointer", opacity: connecting === repo.full_name ? 0.5 : 1 }}
+                      >
+                        {connecting === repo.full_name ? "Adding…" : "Add project"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", marginTop: 12 }}>
+                Signed in as <strong>{githubUsername}</strong> · {repos.length} repositories
+              </div>
+            </>
+          )
         )}
 
         {/* ── Manual tab ── */}

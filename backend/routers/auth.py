@@ -10,8 +10,8 @@ from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
-from ..db.database import get_db
-from ..models.user import User
+from db.database import get_db
+from models.user import User
 
 router = APIRouter()
 security = HTTPBearer()

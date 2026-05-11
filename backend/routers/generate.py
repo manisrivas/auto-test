@@ -7,11 +7,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..db.database import get_db
-from ..models.user import Plan, User
-from ..services.ai import generate_tests_for_functions
-from ..services.plan_guard import require_usage_within_limit
-from ..services.usage import increment_usage
+from db.database import get_db
+from models.user import Plan, User
+from services.ai import generate_tests_for_functions
+from services.plan_guard import require_usage_within_limit
+from services.usage import increment_usage
 
 router = APIRouter()
 

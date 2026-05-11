@@ -3,7 +3,10 @@
     "allow": [
       "Bash(python -c \"from autotest.generator import generate_tests; print\\('CLI generator OK'\\)\")",
       "Bash(python -c \"from autotest.cli import main; print\\('CLI main OK'\\)\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git commit *)"
     ]
   }
 }

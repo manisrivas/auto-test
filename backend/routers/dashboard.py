@@ -3,12 +3,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..db.database import get_db
-from ..models.project import Project
-from ..models.report import FunctionResult, Report
-from ..models.user import User
-from ..routers.auth import get_current_user
-from ..services.ai import get_ai_suggestions
+from db.database import get_db
+from models.project import Project
+from models.report import FunctionResult, Report
+from models.user import User
+from routers.auth import get_current_user
+from services.ai import get_ai_suggestions
 
 router = APIRouter()
 

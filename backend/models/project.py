@@ -2,7 +2,7 @@ import uuid
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 
-from ..db.database import Base
+from db.database import Base
 
 
 class Project(Base):

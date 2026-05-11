@@ -8,10 +8,10 @@ from sqlalchemy.orm import Session
 
 import stripe
 
-from ..db.database import get_db
-from ..models.user import Plan, User
-from ..routers.auth import get_current_user
-from ..services.usage import MONTHLY_LIMITS, get_monthly_usage
+from db.database import get_db
+from models.user import Plan, User
+from routers.auth import get_current_user
+from services.usage import MONTHLY_LIMITS, get_monthly_usage
 
 router = APIRouter()
 

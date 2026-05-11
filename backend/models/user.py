@@ -3,7 +3,7 @@ from enum import Enum as PyEnum
 
 from sqlalchemy import Column, DateTime, String, Text, func
 
-from ..db.database import Base
+from db.database import Base
 
 
 class Plan(str, PyEnum):

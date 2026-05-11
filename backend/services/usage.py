@@ -3,8 +3,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models.billing import UsageRecord
-from ..models.user import Plan
+from models.billing import UsageRecord
+from models.user import Plan
 
 MONTHLY_LIMITS: dict[str, int] = {
     Plan.free: 50,

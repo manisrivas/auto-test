@@ -6,9 +6,9 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .db.database import create_tables
-from .models import user, project, report, billing as billing_model  # ensure tables registered
-from .routers import auth, billing, dashboard, generate, github as github_router, projects, reports
+from db.database import create_tables
+from models import user, project, report, billing as billing_model  # ensure tables registered
+from routers import auth, billing, dashboard, generate, github as github_router, projects, reports
 
 app = FastAPI(title="AutoTest API", version="0.1.0", docs_url="/docs")
 

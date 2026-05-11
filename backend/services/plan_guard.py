@@ -1,9 +1,9 @@
 from fastapi import Depends, HTTPException, status
 
-from ..db.database import get_db
-from ..models.user import User
-from .usage import get_monthly_usage, MONTHLY_LIMITS
-from ..routers.auth import get_current_user
+from db.database import get_db
+from models.user import User
+from services.usage import get_monthly_usage, MONTHLY_LIMITS
+from routers.auth import get_current_user
 
 
 def require_usage_within_limit(

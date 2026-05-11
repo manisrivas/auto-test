@@ -17,8 +17,26 @@ class Base(DeclarativeBase):
 
 
 def create_tables() -> None:
-    """Create all tables (idempotent — use Alembic for migrations in prod)."""
+    """Create tables and apply any missing column additions."""
     Base.metadata.create_all(bind=engine)
+    _apply_migrations()
+
+
+def _apply_migrations() -> None:
+    """Add columns that were introduced after the initial schema creation."""
+    migrations = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS github_access_token TEXT",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS github_username VARCHAR",
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_full_name TEXT",
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_webhook_id TEXT",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(__import__("sqlalchemy").text(sql))
+            except Exception:
+                pass  # column may already exist or DB doesn't support IF NOT EXISTS
+        conn.commit()
 
 
 def get_db():

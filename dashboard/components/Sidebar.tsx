@@ -7,26 +7,12 @@ const nav = [
   {
     section: "Overview",
     items: [
-      { label: "Dashboard",    icon: "ti-layout-dashboard", href: "/dashboard" },
-      { label: "Repositories", icon: "ti-brand-github",    href: "/dashboard/repos" },
-      { label: "Projects",     icon: "ti-folder",          href: "/dashboard", badge: null },
-      { label: "Analytics", icon: "ti-chart-area-line",  href: "/dashboard" },
+      { label: "Projects",  icon: "ti-layout-dashboard", href: "/dashboard" },
     ],
   },
   {
-    section: "Quality",
+    section: "Account",
     items: [
-      { label: "Gates",       icon: "ti-shield-check",   href: "/dashboard" },
-      { label: "Failures",    icon: "ti-bug",             href: "/dashboard", badge: "3" },
-      { label: "AI Insights", icon: "ti-sparkles",        href: "/dashboard" },
-      { label: "Push Log",    icon: "ti-history",         href: "/dashboard" },
-    ],
-  },
-  {
-    section: "Team",
-    items: [
-      { label: "Members",  icon: "ti-users",    href: "/dashboard" },
-      { label: "API Keys", icon: "ti-key",      href: "/dashboard" },
       { label: "Settings", icon: "ti-settings", href: "/dashboard/settings" },
     ],
   },
@@ -82,11 +68,6 @@ export default function Sidebar({ projectName }: { projectName?: string }) {
                 >
                   <i className={`ti ${item.icon}`} style={{ fontSize: 15, opacity: active ? 1 : 0.7 }} />
                   {item.label}
-                  {"badge" in item && item.badge && (
-                    <span style={{ marginLeft: "auto", background: "rgba(192,57,43,0.9)", color: "#fff", fontFamily: "DM Mono, monospace", fontSize: 9, width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      {item.badge}
-                    </span>
-                  )}
                 </div>
               );
             })}

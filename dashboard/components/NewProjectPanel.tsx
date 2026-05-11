@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
 import { connectRepo, createProject, storeGitHubToken, GitHubRepo, Project } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -12,10 +11,7 @@ interface Props {
 }
 
 export default function NewProjectPanel({ onCreated, onCancel }: Props) {
-  const { data: session } = useSession();
-  const { token, email } = useAuth();
-  const githubToken = (session as { githubToken?: string })?.githubToken ?? "";
-  const githubUsername = (session as { githubUsername?: string })?.githubUsername ?? "";
+  const { token, email, githubToken, githubUsername, githubConnected } = useAuth();
 
   const [tab, setTab] = useState<"github" | "manual">("github");
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -28,6 +24,7 @@ export default function NewProjectPanel({ onCreated, onCancel }: Props) {
   const [manualError, setManualError] = useState("");
 
   useEffect(() => {
+    if (!githubConnected) { setRepos([]); return; }
     if (tab !== "github" || !githubToken) return;
     setReposLoading(true);
     setReposError("");
@@ -119,7 +116,7 @@ export default function NewProjectPanel({ onCreated, onCancel }: Props) {
 
       <div style={{ padding: 24 }}>
         {tab === "github" && (
-          !githubToken ? (
+          !githubConnected ? (
             <div style={{ textAlign: "center", padding: "32px 0" }}>
               <div style={{ width: 48, height: 48, background: "#0a0a0a", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                 <i className="ti ti-brand-github" style={{ fontSize: 24, color: "#fff" }} />

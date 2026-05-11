@@ -48,6 +48,8 @@ class AuthResponse(BaseModel):
 class MeResponse(BaseModel):
     email: str
     plan: str
+    github_username: str | None = None
+    github_connected: bool = False
 
 
 def _create_token(user_id: str) -> str:
@@ -131,4 +133,9 @@ def logout() -> dict:
 
 @router.get("/me", response_model=MeResponse)
 def me(current_user: User = Depends(get_current_user)) -> MeResponse:
-    return MeResponse(email=current_user.email, plan=current_user.plan)
+    return MeResponse(
+        email=current_user.email,
+        plan=current_user.plan,
+        github_username=current_user.github_username,
+        github_connected=bool(current_user.github_access_token),
+    )

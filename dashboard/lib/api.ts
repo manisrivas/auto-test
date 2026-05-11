@@ -27,6 +27,17 @@ export interface AuthResponse {
   plan: string;
 }
 
+export interface MeResponse {
+  email: string;
+  plan: string;
+  github_username: string | null;
+  github_connected: boolean;
+}
+
+export function getMe(token: string): Promise<MeResponse> {
+  return request<MeResponse>("/auth/me", {}, token);
+}
+
 export function login(email: string, password: string): Promise<AuthResponse> {
   return request<AuthResponse>("/auth/login", {
     method: "POST",

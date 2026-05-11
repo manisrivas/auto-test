@@ -9,25 +9,27 @@ import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { token, email, githubUsername, ready } = useAuth();
+  const { token, email, githubUsername, githubConnected, setGitHubConnected, ready } = useAuth();
   const router = useRouter();
   const plan = (session?.user as { plan?: string })?.plan ?? "free";
-  const githubConnected = !!githubUsername;
 
   const [disconnecting, setDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState("");
+  const [confirmStep, setConfirmStep] = useState(false);
 
   async function handleDisconnect() {
-    if (!confirm("Disconnect GitHub? Your connected repos will still exist as projects but webhooks will stop working.")) return;
-    if (!token) { setDisconnectError("Still loading auth — please wait a moment and try again."); return; }
+    if (!confirmStep) { setConfirmStep(true); return; }
+    if (!token) { setDisconnectError("Auth not ready — please refresh and try again."); return; }
     setDisconnecting(true);
     setDisconnectError("");
     try {
       await disconnectGitHub(token);
-      await signOut({ callbackUrl: "/login" });
+      setGitHubConnected(false);
+      setConfirmStep(false);
     } catch (e: unknown) {
       setDisconnectError(e instanceof Error ? e.message : "Failed to disconnect");
       setDisconnecting(false);
+      setConfirmStep(false);
     }
   }
 
@@ -77,14 +79,29 @@ export default function SettingsPage() {
                 "GitHub OAuth is active — repos can be imported"
               )}
               {row("Disconnect", (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                  <button
-                    onClick={handleDisconnect}
-                    disabled={disconnecting || !ready || !token}
-                    style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", background: "none", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer", opacity: (disconnecting || !ready || !token) ? 0.4 : 1 }}
-                  >
-                    {!ready ? "Loading…" : disconnecting ? "Disconnecting…" : "Disconnect GitHub"}
-                  </button>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                  {confirmStep && !disconnecting && (
+                    <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#c0392b" }}>
+                      Repos stay — webhooks stop. Click again to confirm.
+                    </span>
+                  )}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {confirmStep && !disconnecting && (
+                      <button
+                        onClick={() => setConfirmStep(false)}
+                        style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a", background: "none", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={disconnecting || !ready || !token}
+                      style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", background: confirmStep ? "rgba(192,57,43,0.08)" : "none", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 6, padding: "4px 12px", cursor: (disconnecting || !ready || !token) ? "not-allowed" : "pointer", opacity: (disconnecting || !ready || !token) ? 0.4 : 1 }}
+                    >
+                      {!ready ? "Loading…" : disconnecting ? "Disconnecting…" : confirmStep ? "Yes, disconnect" : "Disconnect GitHub"}
+                    </button>
+                  </div>
                   {disconnectError && <span style={{ fontSize: 10, color: "#c0392b", fontFamily: "DM Mono, monospace" }}>{disconnectError}</span>}
                 </div>
               ))}

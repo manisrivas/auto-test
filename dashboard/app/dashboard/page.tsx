@@ -8,7 +8,7 @@ import SetupGuide from "@/components/SetupGuide";
 import NewProjectPanel from "@/components/NewProjectPanel";
 
 export default function DashboardPage() {
-  const { token, email, ready } = useAuth();
+  const { token, email, ready, authError } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,11 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+        {authError && (
+          <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 10, padding: "10px 14px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b" }}>
+            <strong>Auth error:</strong> {authError}
+          </div>
+        )}
         {error && (
           <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 10, padding: "10px 14px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b" }}>{error}</div>
         )}

@@ -3,11 +3,12 @@
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getDashboard, DashboardData } from "@/lib/api";
+import { getDashboard, getProjects, DashboardData } from "@/lib/api";
 import TrendChart from "@/components/TrendChart";
 import FunctionTable from "@/components/FunctionTable";
 import ErrorList from "@/components/ErrorList";
 import AISuggestions from "@/components/AISuggestions";
+import SetupGuide from "@/components/SetupGuide";
 
 function KpiCard({ label, value, delta, deltaUp, barPct, barColor }: {
   label: string; value: string; delta: string; deltaUp?: boolean; barPct: number; barColor: string;
@@ -33,6 +34,7 @@ export default function ProjectDetailPage() {
   const { data: session } = useSession();
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [projectKey, setProjectKey] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -40,8 +42,15 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     if (!token || !id) return;
-    getDashboard(id, token)
-      .then(setData)
+    Promise.all([
+      getDashboard(id, token),
+      getProjects(token),
+    ])
+      .then(([dash, projects]) => {
+        setData(dash);
+        const proj = projects.find((p) => p.id === id);
+        if (proj) setProjectKey(proj.project_key);
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [token, id]);
@@ -87,6 +96,11 @@ export default function ProjectDetailPage() {
       </div>
 
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
+
+        {/* No-data setup guide */}
+        {data.recent_pushes.length === 0 && projectKey && (
+          <SetupGuide projectKey={projectKey} projectName={data.project.name} />
+        )}
 
         {/* KPIs */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>

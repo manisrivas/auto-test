@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getProjects, createProject, Project } from "@/lib/api";
+import SetupGuide from "@/components/SetupGuide";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [newProject, setNewProject] = useState<Project | null>(null);
 
   const token = (session as { token?: string })?.token ?? "";
 
@@ -34,6 +36,7 @@ export default function DashboardPage() {
       setProjects((prev) => [...prev, p]);
       setNewName("");
       setShowForm(false);
+      setNewProject(p);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to create project");
     } finally {
@@ -69,7 +72,7 @@ export default function DashboardPage() {
         )}
 
         {/* Create form */}
-        {showForm && (
+        {showForm && !newProject && (
           <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: "20px" }}>
             <form onSubmit={handleCreate} style={{ display: "flex", gap: 10 }}>
               <input
@@ -87,13 +90,29 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* Setup guide — shown immediately after project creation */}
+        {newProject && (
+          <SetupGuide
+            projectKey={newProject.project_key}
+            projectName={newProject.name}
+            onDone={() => { setNewProject(null); router.push(`/dashboard/projects/${newProject.id}`); }}
+          />
+        )}
+
         {loading ? (
           <div style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#8a8a8a" }}>Loading…</div>
         ) : projects.length === 0 ? (
           <div style={{ background: "#fff", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: 14, padding: "64px 32px", textAlign: "center" }}>
-            <p style={{ fontSize: 13, color: "#8a8a8a" }}>No projects yet.</p>
-            <button onClick={() => setShowForm(true)} style={{ marginTop: 10, fontFamily: "DM Mono, monospace", fontSize: 11, color: "#3a3a3a", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-              Create your first project →
+            <div style={{ width: 44, height: 44, background: "#f2f2ef", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+              <i className="ti ti-folder-plus" style={{ fontSize: 20, color: "#8a8a8a" }} />
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 500, color: "#0a0a0a", marginBottom: 6 }}>No projects yet</p>
+            <p style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a", marginBottom: 20 }}>Create a project to get your project key, then run<br /><code>autotest --install</code> or <code>autotest --scan</code> in your repo</p>
+            <button
+              onClick={() => setShowForm(true)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 20px", borderRadius: 8, border: "none", background: "#0a0a0a", color: "#fff", fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 500, cursor: "pointer" }}
+            >
+              <i className="ti ti-plus" style={{ fontSize: 13 }} /> Create first project
             </button>
           </div>
         ) : (

@@ -1,7 +1,8 @@
 import ast
+import os
 import re
 import subprocess
-from typing import List
+from typing import Any, Dict, List
 
 from .providers.base import FunctionInfo
 
@@ -158,6 +159,164 @@ def _extract_js_functions(file_path: str, source: str) -> List[FunctionInfo]:
         functions.append(FunctionInfo(name=name, file=file_path, code=code, line=line_num))
 
     return functions
+
+
+def scan_quality_issues(language: str, root: str = ".") -> List[Dict[str, Any]]:
+    """Static analysis: production issues, dead code, stale files. Zero AI, pure regex/git."""
+    exts = _LANG_EXTS.get(language.lower(), {".py"})
+    skip_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".next", "dist", "build"}
+    all_files: List[str] = []
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        for fname in filenames:
+            if any(fname.endswith(ext) for ext in exts):
+                all_files.append(os.path.join(dirpath, fname))
+
+    if not all_files:
+        return []
+
+    sources: Dict[str, str] = {}
+    for fp in all_files:
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                sources[fp] = f.read()
+        except (OSError, UnicodeDecodeError):
+            pass
+
+    combined = "\n".join(sources.values())
+    issues: List[Dict[str, Any]] = []
+
+    for fp, src in sources.items():
+        issues.extend(_check_production_issues(fp, src, language))
+        issues.extend(_check_dead_functions(fp, src, language, combined))
+
+    issues.extend(_check_stale_files(list(sources.keys())))
+    return issues
+
+
+def _is_test_file(file_path: str) -> bool:
+    name = os.path.basename(file_path).lower()
+    return "test" in name or "spec" in name
+
+
+def _check_production_issues(file_path: str, source: str, language: str) -> List[Dict[str, Any]]:
+    """Flag print/console.log, debugger calls, TODO comments, hardcoded secrets."""
+    if _is_test_file(file_path):
+        return []
+
+    issues: List[Dict[str, Any]] = []
+    is_python = language.lower() == "python"
+
+    for i, raw_line in enumerate(source.splitlines(), 1):
+        line = raw_line.strip()
+
+        if is_python and re.match(r'^print\s*\(', line):
+            issues.append({"type": "production_issue", "severity": "warning",
+                           "file": file_path, "line": i,
+                           "message": "print() statement in production code",
+                           "snippet": line[:80]})
+
+        if not is_python and re.match(r'^console\.(log|warn|error|debug)\s*\(', line):
+            issues.append({"type": "production_issue", "severity": "warning",
+                           "file": file_path, "line": i,
+                           "message": "console.log() statement in production code",
+                           "snippet": line[:80]})
+
+        if is_python and re.search(r'\b(pdb\.set_trace\(\)|breakpoint\(\))', line):
+            issues.append({"type": "production_issue", "severity": "error",
+                           "file": file_path, "line": i,
+                           "message": "Debugger breakpoint left in code",
+                           "snippet": line[:80]})
+
+        if not is_python and re.search(r'\bdebugger\b', line):
+            issues.append({"type": "production_issue", "severity": "error",
+                           "file": file_path, "line": i,
+                           "message": "debugger statement in production code",
+                           "snippet": line[:80]})
+
+        if re.search(r'#\s*(TODO|FIXME|HACK|XXX)\b', line) or re.search(r'//\s*(TODO|FIXME|HACK|XXX)\b', line):
+            issues.append({"type": "production_issue", "severity": "warning",
+                           "file": file_path, "line": i,
+                           "message": f"Unresolved comment: {line[:60]}",
+                           "snippet": line[:80]})
+
+        if re.search(r'(?i)(password|secret|api_key|apikey|auth_token)\s*=\s*["\'][^"\']{6,}["\']', line):
+            safe = re.sub(r'=\s*(["\']).*?\1', '= "***"', line)
+            issues.append({"type": "production_issue", "severity": "error",
+                           "file": file_path, "line": i,
+                           "message": "Possible hardcoded secret or credential",
+                           "snippet": safe[:80]})
+
+    return issues
+
+
+def _check_dead_functions(
+    file_path: str, source: str, language: str, combined: str
+) -> List[Dict[str, Any]]:
+    """Flag Python functions that appear to have no callers across the whole project."""
+    if _is_test_file(file_path) or language.lower() != "python":
+        return []
+
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    issues: List[Dict[str, Any]] = []
+    skip_names = {"main", "app", "create_app", "setup", "teardown", "handler", "lambda_handler"}
+
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        name = node.name
+        if name.startswith("_") or name in skip_names:
+            continue
+        # Count calls: `name(` anywhere in combined source
+        call_matches = len(re.findall(r'\b' + re.escape(name) + r'\s*\(', combined))
+        # The def line itself contributes 0 (it's `def name(`, not `name(`)
+        if call_matches == 0:
+            issues.append({"type": "dead_code", "severity": "warning",
+                           "file": file_path, "line": node.lineno,
+                           "message": f"Function '{name}' has no callers in the project",
+                           "snippet": f"def {name}(...)"})
+
+    return issues
+
+
+def _check_stale_files(all_files: List[str]) -> List[Dict[str, Any]]:
+    """Flag files with no git commits in the last 90 days."""
+    import datetime
+    issues: List[Dict[str, Any]] = []
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=90)
+
+    for fp in all_files:
+        if _is_test_file(fp):
+            continue
+        last_mod = _git_file_last_modified(fp)
+        if last_mod and last_mod < cutoff:
+            days = (datetime.datetime.now(datetime.timezone.utc) - last_mod).days
+            issues.append({"type": "stale_code", "severity": "warning",
+                           "file": fp, "line": 0,
+                           "message": f"No commits in {days} days — may be stale or dead",
+                           "snippet": ""})
+
+    return issues
+
+
+def _git_file_last_modified(file_path: str) -> "Any":
+    import datetime
+    try:
+        r = subprocess.run(
+            ["git", "log", "-1", "--format=%aI", "--", file_path],
+            capture_output=True, text=True, timeout=5,
+        )
+        date_str = r.stdout.strip()
+        if not date_str:
+            return None
+        return datetime.datetime.fromisoformat(date_str)
+    except Exception:
+        return None
 
 
 def _find_closing_brace(source: str, open_pos: int) -> int:

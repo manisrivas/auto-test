@@ -3,7 +3,7 @@ import os
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
-from typing import List
+from typing import Any, Dict, List
 
 from .runner import RunResult
 from .config import get_token, get_user_info
@@ -17,13 +17,14 @@ def send_report(
     branch: str,
     commit: str,
     plan: str,
+    quality_checks: List[Dict[str, Any]] = [],
 ) -> None:
     """POST results to the dashboard API. Never blocks push on failure."""
     project_key = os.environ.get("AUTOTEST_PROJECT_KEY")
     if not project_key:
         return
 
-    payload = _build_payload(language, results, branch, commit, plan)
+    payload = _build_payload(language, results, branch, commit, plan, quality_checks)
     token = get_token()
 
     headers: dict = {
@@ -42,6 +43,7 @@ def _build_payload(
     branch: str,
     commit: str,
     plan: str,
+    quality_checks: List[Dict[str, Any]],
 ) -> bytes:
     user_info = get_user_info()
     total_gen = sum(r.tests_generated for r in results)
@@ -74,6 +76,7 @@ def _build_payload(
             }
             for r in results
         ],
+        "quality_checks": quality_checks,
     }).encode()
 
 

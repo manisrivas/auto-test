@@ -121,6 +121,14 @@ export interface DashboardData {
   }[];
   files: { name: string; coverage: number; risk: string }[];
   ai_suggestions: string[];
+  quality_checks: {
+    type: "dead_code" | "production_issue" | "stale_code";
+    severity: "warning" | "error";
+    file: string;
+    line: number;
+    message: string;
+    snippet: string;
+  }[];
 }
 
 export function getDashboard(projectId: string, token: string): Promise<DashboardData> {

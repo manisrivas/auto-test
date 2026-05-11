@@ -24,9 +24,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <AuthProvider>
-      <div style={{ display: "flex", minHeight: "100vh" }}>
-        <Sidebar />
-        <div style={{ flex: 1, background: "#fafaf8", overflow: "auto" }}>
+      <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
+        <div style={{ width: 240, flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
+          <Sidebar />
+        </div>
+        <div style={{ flex: 1, background: "#fafaf8", overflowY: "auto" }}>
           {children}
         </div>
       </div>

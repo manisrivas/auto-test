@@ -20,6 +20,7 @@ class Report(Base):
     tests_failed = Column(Integer)
     status = Column(String)  # passed | failed
     pushed_at = Column(DateTime(timezone=True), server_default=func.now())
+    quality_checks = Column(Text, nullable=True)  # JSON array of quality issue objects
 
 
 class FunctionResult(Base):

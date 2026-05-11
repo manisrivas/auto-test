@@ -30,6 +30,7 @@ def _apply_migrations() -> None:
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS github_username VARCHAR",
         "ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_full_name TEXT",
         "ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_webhook_id TEXT",
+        "ALTER TABLE reports ADD COLUMN IF NOT EXISTS quality_checks TEXT",
     ]
     for sql in migrations:
         with engine.connect() as conn:

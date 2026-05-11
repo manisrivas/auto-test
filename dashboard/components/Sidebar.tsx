@@ -28,7 +28,7 @@ export default function Sidebar({ projectName }: { projectName?: string }) {
   const initials = email.slice(0, 2).toUpperCase();
 
   return (
-    <nav style={{ background: "#0a0a0a", width: 240, minHeight: "100vh", display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <nav style={{ background: "#0a0a0a", width: 240, height: "100%", display: "flex", flexDirection: "column", flexShrink: 0 }}>
       {/* Logo */}
       <div style={{ padding: "28px 24px 24px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

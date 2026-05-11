@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -75,6 +76,7 @@ def get_dashboard(
         ],
         "files": file_coverage,
         "ai_suggestions": suggestions,
+        "quality_checks": _get_latest_quality_checks(reports[0]) if reports else [],
     }
 
 
@@ -139,6 +141,15 @@ def _aggregate_file_coverage(db: Session, project_id: str) -> list[dict]:
         cov = int((counts["passed"] / counts["total"] * 100) if counts["total"] > 0 else 0)
         result.append({"name": file, "coverage": cov, "risk": _risk(cov)})
     return sorted(result, key=lambda x: x["coverage"])
+
+
+def _get_latest_quality_checks(report: Report) -> list:
+    if not report or not report.quality_checks:
+        return []
+    try:
+        return json.loads(report.quality_checks)
+    except (json.JSONDecodeError, TypeError):
+        return []
 
 
 def _risk(coverage: int) -> str:

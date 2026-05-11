@@ -8,7 +8,7 @@ from .generator import generate_tests
 from .hook import install_hook, uninstall_hook
 from .reporter import print_report
 from .runner import run_tests
-from .scanner import get_changed_functions, get_all_functions
+from .scanner import get_changed_functions, get_all_functions, scan_quality_issues
 from .sender import send_report
 
 
@@ -67,12 +67,17 @@ def _run(language: str) -> None:
 
     print_report(results)
 
+    quality_checks = scan_quality_issues(language)
+    if quality_checks:
+        print(f"  {len(quality_checks)} code quality issue(s) found — details on dashboard.\n")
+
     send_report(
         language=language,
         results=results,
         branch=_git_branch(),
         commit=_git_commit(),
         plan=_detect_plan(),
+        quality_checks=quality_checks,
     )
 
     total_gen = sum(r.tests_generated for r in results)
@@ -125,12 +130,17 @@ def _full_scan(language: str) -> None:
 
     print_report(all_results)
 
+    quality_checks = scan_quality_issues(language)
+    if quality_checks:
+        print(f"  {len(quality_checks)} code quality issue(s) found — details on dashboard.\n")
+
     send_report(
         language=language,
         results=all_results,
         branch=_git_branch(),
         commit=_git_commit(),
         plan=_detect_plan(),
+        quality_checks=quality_checks,
     )
 
     total_gen = sum(r.tests_generated for r in all_results)

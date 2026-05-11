@@ -85,24 +85,27 @@ export default function ProjectDetailPage() {
       </div>
 
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
-        {data.recent_pushes.length === 0 && projectKey && (
-          <SetupGuide projectKey={projectKey} projectName={data.project.name} />
-        )}
+        {/* Top row: 2×2 KPI cards (60%) + Setup guide (40%) */}
+        <div style={{ display: "grid", gridTemplateColumns: data.recent_pushes.length === 0 && projectKey ? "3fr 2fr" : "1fr", gap: 20, alignItems: "start" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <KpiCard label="Coverage" value={`${data.coverage.current}%`}
+              delta={`${data.coverage.trend === "up" ? "+" : ""}${data.coverage.current - data.coverage.previous}% vs prev`}
+              deltaUp={data.coverage.trend === "up" ? true : data.coverage.trend === "down" ? false : undefined}
+              barPct={data.coverage.current} barColor="#0a0a0a" />
+            <KpiCard label="Tests passed" value={String(data.recent_pushes.reduce((s, p) => s + (p.status === "passed" ? 1 : 0), 0))}
+              delta="recent pushes" barPct={75} barColor="#2ea865" />
+            <KpiCard label="Failures" value={String(data.recent_pushes.filter(p => p.status === "failed").length)}
+              delta="failed pushes"
+              deltaUp={data.recent_pushes.filter(p => p.status === "failed").length > 0 ? false : undefined}
+              barPct={data.recent_pushes.filter(p => p.status === "failed").length * 10} barColor="#c0392b" />
+            <KpiCard label="Total pushes" value={String(data.recent_pushes.length)}
+              delta={`${new Set(data.recent_pushes.map(p => p.developer)).size} developer(s)`}
+              barPct={60} barColor="#8a8a8a" />
+          </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-          <KpiCard label="Coverage" value={`${data.coverage.current}%`}
-            delta={`${data.coverage.trend === "up" ? "+" : ""}${data.coverage.current - data.coverage.previous}% vs prev`}
-            deltaUp={data.coverage.trend === "up" ? true : data.coverage.trend === "down" ? false : undefined}
-            barPct={data.coverage.current} barColor="#0a0a0a" />
-          <KpiCard label="Tests passed" value={String(data.recent_pushes.reduce((s, p) => s + (p.status === "passed" ? 1 : 0), 0))}
-            delta="recent pushes" barPct={75} barColor="#2ea865" />
-          <KpiCard label="Failures" value={String(data.recent_pushes.filter(p => p.status === "failed").length)}
-            delta="failed pushes"
-            deltaUp={data.recent_pushes.filter(p => p.status === "failed").length > 0 ? false : undefined}
-            barPct={data.recent_pushes.filter(p => p.status === "failed").length * 10} barColor="#c0392b" />
-          <KpiCard label="Total pushes" value={String(data.recent_pushes.length)}
-            delta={`${new Set(data.recent_pushes.map(p => p.developer)).size} developer(s)`}
-            barPct={60} barColor="#8a8a8a" />
+          {data.recent_pushes.length === 0 && projectKey && (
+            <SetupGuide projectKey={projectKey} projectName={data.project.name} />
+          )}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 12 }}>
@@ -144,7 +147,102 @@ export default function ProjectDetailPage() {
         </div>
 
         <FunctionTable files={data.files} />
+
+        {data.quality_checks && data.quality_checks.length > 0 && (
+          <CodeQualityPanel checks={data.quality_checks} />
+        )}
       </div>
     </>
+  );
+}
+
+type QualityCheck = DashboardData["quality_checks"][number];
+
+const TYPE_LABELS: Record<string, string> = {
+  production_issue: "Production Issue",
+  dead_code: "Dead Code",
+  stale_code: "Stale Code",
+};
+
+const TYPE_COLOR: Record<string, string> = {
+  production_issue: "#c0392b",
+  dead_code: "#8a4a00",
+  stale_code: "#5a5a8a",
+};
+
+const TYPE_BG: Record<string, string> = {
+  production_issue: "#fdf0ee",
+  dead_code: "#fdf6ee",
+  stale_code: "#f0f0f8",
+};
+
+const SEV_COLOR: Record<string, string> = {
+  error: "#c0392b",
+  warning: "#d4820a",
+};
+
+function CodeQualityPanel({ checks }: { checks: QualityCheck[] }) {
+  const grouped: Record<string, QualityCheck[]> = {};
+  for (const c of checks) {
+    if (!grouped[c.type]) grouped[c.type] = [];
+    grouped[c.type].push(c);
+  }
+
+  const errorCount = checks.filter(c => c.severity === "error").length;
+  const warnCount = checks.filter(c => c.severity === "warning").length;
+
+  return (
+    <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, overflow: "hidden" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a" }}>Code Quality</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          {errorCount > 0 && (
+            <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, background: "#fdf0ee", color: "#c0392b", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 20, padding: "3px 10px" }}>
+              {errorCount} error{errorCount !== 1 ? "s" : ""}
+            </span>
+          )}
+          {warnCount > 0 && (
+            <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, background: "#fdf6ee", color: "#d4820a", border: "1px solid rgba(212,130,10,0.2)", borderRadius: 20, padding: "3px 10px" }}>
+              {warnCount} warning{warnCount !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
+        {Object.entries(grouped).map(([type, items]) => (
+          <div key={type}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, fontWeight: 600, color: TYPE_COLOR[type] ?? "#3a3a3a", background: TYPE_BG[type] ?? "#f5f5f2", border: `1px solid ${TYPE_COLOR[type] ?? "#aaa"}22`, borderRadius: 4, padding: "2px 8px" }}>
+                {TYPE_LABELS[type] ?? type}
+              </span>
+              <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a" }}>{items.length} issue{items.length !== 1 ? "s" : ""}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {items.map((c, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "#fafaf8", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 8, padding: "8px 12px" }}>
+                  <span style={{ fontFamily: "DM Mono, monospace", fontSize: 9, color: SEV_COLOR[c.severity] ?? "#8a8a8a", marginTop: 1, flexShrink: 0 }}>
+                    {c.severity === "error" ? "✖" : "⚠"}
+                  </span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 12, color: "#0a0a0a" }}>{c.message}</span>
+                      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", flexShrink: 0 }}>
+                        {c.file.split(/[/\\]/).pop()}{c.line > 0 ? `:${c.line}` : ""}
+                      </span>
+                    </div>
+                    {c.snippet && (
+                      <code style={{ display: "block", marginTop: 4, fontFamily: "DM Mono, monospace", fontSize: 10, color: "#5a5a5a", background: "#f0f0ee", borderRadius: 4, padding: "3px 7px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                        {c.snippet}
+                      </code>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
+import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
@@ -40,6 +41,7 @@ class ReportRequest(BaseModel):
     plan: str
     summary: SummaryInput
     functions: list[FunctionResultInput]
+    quality_checks: list[Any] = []
 
 
 @router.post("/report", status_code=201)
@@ -67,6 +69,7 @@ def submit_report(
         tests_passed=body.summary.tests_passed,
         tests_failed=body.summary.tests_failed,
         status=status_str,
+        quality_checks=json.dumps(body.quality_checks) if body.quality_checks else None,
     )
     db.add(report)
     db.flush()

@@ -7,32 +7,52 @@ from typing import Optional
 
 from .config import set_token, clear_token, get_token, get_user_info
 
-_API_URL = os.environ.get("AUTOTEST_API_URL", "https://autotest-backend-production.up.railway.app")
-_DASHBOARD_URL = os.environ.get("AUTOTEST_DASHBOARD_URL", "https://autotest-dashboard.vercel.app")
+_API_URL = os.environ.get("AUTOTEST_API_URL", "https://auto-test-production-64b6.up.railway.app")
 
 
 def login() -> None:
-    """Interactive login — user pastes a CLI token from the web dashboard."""
-    print(f"\nOpen this URL in your browser:\n  {_DASHBOARD_URL}/login\n")
-    print("After signing in, paste your CLI token here:")
+    """Interactive login — prompts for email and password."""
+    print("\nAutoTest Login")
+    print("-" * 30)
 
     try:
-        token = input("Token: ").strip()
+        email = input("Email: ").strip()
+        if not email:
+            print("Email required.")
+            return
+        import getpass
+        password = getpass.getpass("Password: ")
+        if not password:
+            print("Password required.")
+            return
     except (KeyboardInterrupt, EOFError):
         print("\nLogin cancelled.")
         return
 
-    if not token:
-        print("No token provided. Login cancelled.")
-        return
-
-    info = _verify_token(token)
-    if info is None:
-        print("Invalid or expired token. Please try again.")
+    payload = json.dumps({"email": email, "password": password}).encode()
+    req = urllib.request.Request(
+        f"{_API_URL}/auth/login",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            print("Incorrect email or password.")
+        else:
+            print(f"Login failed: {e.code}")
+        sys.exit(1)
+    except urllib.error.URLError:
+        print("Cannot reach AutoTest server. Check your connection.")
         sys.exit(1)
 
-    set_token(token, info["email"], info["plan"])
-    print(f"\n  Logged in as {info['email']} ({info['plan'].title()} plan)")
+    token = data.get("token", "")
+    plan = data.get("plan", "free")
+    set_token(token, email, plan)
+    print(f"\n  Logged in as {email} ({plan.title()} plan)\n")
 
 
 def logout() -> None:
@@ -59,7 +79,7 @@ def whoami() -> None:
 def _verify_token(token: str) -> Optional[dict]:
     """Call backend to verify token; return user info dict or None on failure."""
     req = urllib.request.Request(
-        f"{_API_URL}/auth/me",
+        f"https://auto-test-production-64b6.up.railway.app/auth/me",
         headers={"Authorization": f"Bearer {token}"},
         method="GET",
     )

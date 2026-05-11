@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
-import { connectRepo, createProject, storeGitHubToken, GitHubRepo, Project } from "@/lib/api";
+import { connectRepo, createProject, storeGitHubToken, githubSignin, GitHubRepo, Project } from "@/lib/api";
 
 interface Props {
   token: string;
@@ -16,6 +16,8 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
   const githubToken = (session as { githubToken?: string })?.githubToken ?? "";
   const githubUsername = (session as { githubUsername?: string })?.githubUsername ?? "";
 
+  const email = session?.user?.email ?? "";
+  const [backendToken, setBackendToken] = useState(token);
   const [tab, setTab] = useState<"github" | "manual">("github");
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [reposLoading, setReposLoading] = useState(false);
@@ -57,11 +59,20 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
   async function handleConnect(repo: GitHubRepo) {
     setConnecting(repo.full_name);
     try {
-      // Store GitHub token in backend first so webhook/API calls work
-      if (token && githubToken) {
-        await storeGitHubToken(githubToken, githubUsername, token).catch(() => {});
+      // If backend token is missing (GitHub OAuth didn't create backend account yet), do it now
+      let activeToken = backendToken;
+      if (!activeToken && email) {
+        const data = await githubSignin(email);
+        activeToken = data.token;
+        setBackendToken(data.token);
       }
-      const result = await connectRepo(repo.full_name, repo.name, token);
+      if (!activeToken) throw new Error("Not authenticated — please log in again");
+
+      // Store GitHub token in backend so webhook/API calls work
+      if (githubToken) {
+        await storeGitHubToken(githubToken, githubUsername, activeToken).catch(() => {});
+      }
+      const result = await connectRepo(repo.full_name, repo.name, activeToken);
       setRepos((prev) => prev.map((r) => r.full_name === repo.full_name ? { ...r, connected: true } : r));
       onCreated({
         id: result.project_id,
@@ -81,7 +92,14 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
     setCreating(true);
     setManualError("");
     try {
-      const p = await createProject(name.trim(), 80, token);
+      let activeToken = backendToken;
+      if (!activeToken && email) {
+        const data = await githubSignin(email);
+        activeToken = data.token;
+        setBackendToken(data.token);
+      }
+      if (!activeToken) throw new Error("Not authenticated — please log in again");
+      const p = await createProject(name.trim(), 80, activeToken);
       onCreated(p);
     } catch (e: unknown) {
       setManualError(e instanceof Error ? e.message : "Failed to create project");

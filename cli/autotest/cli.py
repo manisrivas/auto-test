@@ -50,7 +50,14 @@ def _run(language: str) -> None:
         return
 
     print(f"Found {len(functions)} function(s). Generating tests...")
-    tests = generate_tests(language, functions)
+    try:
+        tests = generate_tests(language, functions)
+    except RuntimeError as e:
+        print(f"\n  ✖  {e}\n")
+        sys.exit(1)
+    except Exception:
+        print("\n  ⚠  Test generation failed unexpectedly — push allowed through.\n")
+        return
     if not tests:
         print("No tests generated — allowing push.")
         return
@@ -87,13 +94,19 @@ def _full_scan(language: str) -> None:
     print(f"Found {len(functions)} function(s) across project. Generating tests...")
     print("(This may take a while for large projects — each batch sent to AI)\n")
 
-    # Process in batches of 10 to avoid huge AI requests
     batch_size = 10
     all_results = []
     for i in range(0, len(functions), batch_size):
         batch = functions[i:i + batch_size]
         print(f"  Batch {i // batch_size + 1}/{(len(functions) + batch_size - 1) // batch_size} — {len(batch)} functions...")
-        tests = generate_tests(language, batch)
+        try:
+            tests = generate_tests(language, batch)
+        except RuntimeError as e:
+            print(f"\n  ✖  {e}\n")
+            sys.exit(1)
+        except Exception:
+            print("\n  ⚠  Test generation failed — skipping remaining batches.\n")
+            break
         if tests:
             results = run_tests(language, tests)
             all_results.extend(results)

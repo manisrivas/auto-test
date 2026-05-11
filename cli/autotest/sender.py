@@ -8,7 +8,7 @@ from typing import List
 from .runner import RunResult
 from .config import get_token, get_user_info
 
-_API_URL = os.environ.get("AUTOTEST_API_URL", "https://autotest-backend-production.up.railway.app")
+_API_URL = os.environ.get("AUTOTEST_API_URL", "https://auto-test-production-64b6.up.railway.app")
 
 
 def send_report(

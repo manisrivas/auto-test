@@ -7,9 +7,9 @@ setup(
     description="AI-powered pre-push test generator — generates unit tests automatically before every git push",
     long_description=open("README.md").read() if os.path.exists("README.md") else "",
     long_description_content_type="text/markdown",
-    author="AutoTest",
-    author_email="hello@autotest.dev",
-    url="https://github.com/yourusername/autotest",
+    author="Mani Srivas",
+    author_email="manisrivasrg@gmail.com",
+    url="https://github.com/manisrivas/auto-test",
     python_requires=">=3.8",
     packages=find_packages(),
     entry_points={
@@ -25,5 +25,5 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Testing",
     ],
-    keywords="testing ai git hooks pytest automated tests",
+    keywords="testing ai git hooks pytest automated tests coverage",
 )

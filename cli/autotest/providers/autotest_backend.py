@@ -10,7 +10,7 @@ from .base import BaseProvider, FunctionInfo, GeneratedTest
 class AutotestBackendProvider(BaseProvider):
     """Pro/Enterprise plan — calls our backend which uses our Anthropic key."""
 
-    DEFAULT_API_URL = "https://autotest-backend-production.up.railway.app"
+    DEFAULT_API_URL = "https://auto-test-production-64b6.up.railway.app"
 
     def __init__(self, token: str) -> None:
         self.token = token
@@ -53,8 +53,14 @@ class AutotestBackendProvider(BaseProvider):
         if e.code == 401:
             raise RuntimeError("Session expired — run: autotest login")
         if e.code == 403:
-            raise RuntimeError("Free plan detected — set an API key or run: autotest login")
+            raise RuntimeError("Free plan — set an AI API key or upgrade at autotest.dev")
         if e.code == 429:
-            raise RuntimeError("Monthly usage limit reached — upgrade your plan at autotest.dev")
+            raise RuntimeError("Monthly usage limit reached — upgrade at autotest.dev")
+        if e.code >= 500:
+            # Server-side failure (our API key issue, backend crash, etc.)
+            # Must NOT block the push — just warn
+            print("\n  ⚠  AutoTest service issue — tests skipped for this push.")
+            print("     Your push is going through. Check autotest.dev/status\n")
+            return
         body = e.read().decode()
         raise RuntimeError(f"Backend error {e.code}: {body}")

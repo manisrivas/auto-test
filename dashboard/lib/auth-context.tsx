@@ -64,14 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (resolvedToken) {
         try {
           const me = await getMe(resolvedToken);
-          setGitHubConnected(me.github_connected);
-          setGitHubConnectedUsername(me.github_username ?? "");
+          // Connected = DB has token OR user is signed in via GitHub OAuth
+          setGitHubConnected(me.github_connected || !!githubToken);
+          setGitHubConnectedUsername(me.github_username || githubUsername);
         } catch {
           setGitHubConnected(!!githubToken);
           setGitHubConnectedUsername(githubUsername);
         }
       } else {
-        // No backend token — fall back to session to at least show GitHub connection state
         setGitHubConnected(!!githubToken);
         setGitHubConnectedUsername(githubUsername);
       }

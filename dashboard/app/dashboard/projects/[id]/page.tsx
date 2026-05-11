@@ -87,7 +87,7 @@ export default function ProjectDetailPage() {
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
         {/* Top row: 2×2 KPI cards (60%) + Setup guide (40%) */}
         <div style={{ display: "grid", gridTemplateColumns: data.recent_pushes.length === 0 && projectKey ? "3fr 2fr" : "1fr", gap: 20, alignItems: "start" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <KpiCard label="Coverage" value={`${data.coverage.current}%`}
               delta={`${data.coverage.trend === "up" ? "+" : ""}${data.coverage.current - data.coverage.previous}% vs prev`}
               deltaUp={data.coverage.trend === "up" ? true : data.coverage.trend === "down" ? false : undefined}

@@ -165,6 +165,10 @@ export function storeGitHubToken(githubToken: string, githubUsername: string, to
   );
 }
 
+export function disconnectGitHub(token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>("/github/disconnect", { method: "DELETE" }, token);
+}
+
 export function getGitHubRepos(token: string): Promise<GitHubRepo[]> {
   return request<GitHubRepo[]>("/github/repos", {}, token);
 }

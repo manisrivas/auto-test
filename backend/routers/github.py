@@ -125,6 +125,18 @@ class ConnectRepoRequest(BaseModel):
     project_name: str
 
 
+@router.delete("/disconnect")
+def disconnect_github(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Remove stored GitHub token from the user account."""
+    current_user.github_access_token = None
+    current_user.github_username = None
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/connect")
 def connect_repo(
     body: ConnectRepoRequest,

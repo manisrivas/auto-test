@@ -6,7 +6,9 @@
       "Bash(npm run *)",
       "Bash(git remote *)",
       "Bash(git branch *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git add *)",
+      "Bash(git push *)"
     ]
   }
 }

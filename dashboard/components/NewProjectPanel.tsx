@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import {
   getGitHubRepos,
   connectRepo,
@@ -124,13 +125,13 @@ export default function NewProjectPanel({ token, onCreated, onCancel }: Props) {
                 <p style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#8a8a8a", marginBottom: 24, lineHeight: 1.7 }}>
                   Sign in with GitHub to see your repositories<br />and import them with one click.
                 </p>
-                <a
-                  href="/api/auth/signin/github"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#0a0a0a", color: "#fff", borderRadius: 8, padding: "10px 24px", fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 500, textDecoration: "none" }}
+                <button
+                  onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#0a0a0a", color: "#fff", borderRadius: 8, padding: "10px 24px", fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 500, border: "none", cursor: "pointer" }}
                 >
                   <i className="ti ti-brand-github" style={{ fontSize: 15 }} />
                   Sign in with GitHub
-                </a>
+                </button>
               </div>
             ) : reposLoading ? (
               <div style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#8a8a8a", padding: "24px 0" }}>Loading repositories…</div>

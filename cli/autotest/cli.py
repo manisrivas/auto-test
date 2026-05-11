@@ -8,7 +8,7 @@ from .generator import generate_tests
 from .hook import install_hook, uninstall_hook
 from .reporter import print_report
 from .runner import run_tests
-from .scanner import get_changed_functions
+from .scanner import get_changed_functions, get_all_functions
 from .sender import send_report
 
 
@@ -24,6 +24,8 @@ def main() -> None:
         install_hook()
     elif "--uninstall" in args:
         uninstall_hook()
+    elif "--scan" in args:
+        _full_scan(_get_lang(args))
     elif "--run" in args:
         _run(_get_lang(args))
     elif args[0] == "login":
@@ -71,6 +73,49 @@ def _run(language: str) -> None:
     coverage = int((total_pass / total_gen * 100) if total_gen > 0 else 0)
     if coverage < 80:
         sys.exit(1)
+
+
+def _full_scan(language: str) -> None:
+    """Full project scan — generates tests for every function, not just changed ones."""
+    print(f"\nAutoTest: scanning ALL {language} functions in project...")
+
+    functions = get_all_functions(language)
+    if not functions:
+        print("No functions found in project.")
+        return
+
+    print(f"Found {len(functions)} function(s) across project. Generating tests...")
+    print("(This may take a while for large projects — each batch sent to AI)\n")
+
+    # Process in batches of 10 to avoid huge AI requests
+    batch_size = 10
+    all_results = []
+    for i in range(0, len(functions), batch_size):
+        batch = functions[i:i + batch_size]
+        print(f"  Batch {i // batch_size + 1}/{(len(functions) + batch_size - 1) // batch_size} — {len(batch)} functions...")
+        tests = generate_tests(language, batch)
+        if tests:
+            results = run_tests(language, tests)
+            all_results.extend(results)
+
+    if not all_results:
+        print("No tests generated.")
+        return
+
+    print_report(all_results)
+
+    send_report(
+        language=language,
+        results=all_results,
+        branch=_git_branch(),
+        commit=_git_commit(),
+        plan=_detect_plan(),
+    )
+
+    total_gen = sum(r.tests_generated for r in all_results)
+    total_pass = sum(r.tests_passed for r in all_results)
+    coverage = int((total_pass / total_gen * 100) if total_gen > 0 else 0)
+    print(f"\nBaseline coverage: {coverage}%")
 
 
 def _get_lang(args: List[str]) -> str:
@@ -126,7 +171,9 @@ Usage:
   autotest login                Sign up / log in
   autotest --install            Install git pre-push hook
   autotest --uninstall          Remove git pre-push hook
-  autotest --run                Run test generation manually (default: python)
+  autotest --scan               Full project scan — analyze ALL functions (first time setup)
+  autotest --scan --lang js     Full scan for JavaScript / JSX
+  autotest --run                Run on changed functions only (used by pre-push hook)
   autotest --run --lang js      Run for JavaScript / JSX
   autotest --run --lang ts      Run for TypeScript / TSX
   autotest logout               Log out

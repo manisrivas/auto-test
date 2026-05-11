@@ -17,6 +17,23 @@ _LANG_EXTS = {
 }
 
 
+def get_all_functions(language: str, root: str = ".") -> List[FunctionInfo]:
+    """Return all functions in the project directory (for initial full scan)."""
+    import os
+    exts = _LANG_EXTS.get(language.lower(), {".py"})
+    functions: List[FunctionInfo] = []
+    skip_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".next", "dist", "build"}
+
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        for fname in filenames:
+            if any(fname.endswith(ext) for ext in exts):
+                full_path = os.path.join(dirpath, fname)
+                functions.extend(_extract_functions(full_path, language))
+
+    return functions
+
+
 def get_changed_functions(language: str) -> List[FunctionInfo]:
     """Return functions from files changed in the most recent push."""
     diff = _get_git_diff()

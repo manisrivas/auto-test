@@ -23,20 +23,21 @@ def create_tables() -> None:
 
 
 def _apply_migrations() -> None:
-    """Add columns that were introduced after the initial schema creation."""
+    """Add columns introduced after initial schema. Each runs in its own transaction."""
+    from sqlalchemy import text
     migrations = [
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS github_access_token TEXT",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS github_username VARCHAR",
         "ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo_full_name TEXT",
         "ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_webhook_id TEXT",
     ]
-    with engine.connect() as conn:
-        for sql in migrations:
+    for sql in migrations:
+        with engine.connect() as conn:
             try:
-                conn.execute(__import__("sqlalchemy").text(sql))
+                conn.execute(text(sql))
+                conn.commit()
             except Exception:
-                pass  # column may already exist or DB doesn't support IF NOT EXISTS
-        conn.commit()
+                conn.rollback()
 
 
 def get_db():

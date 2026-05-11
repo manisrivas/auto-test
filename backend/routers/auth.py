@@ -112,17 +112,24 @@ class GitHubSigninRequest(BaseModel):
 def github_signin(body: GitHubSigninRequest, db: Session = Depends(get_db)) -> AuthResponse:
     """Find or create a user account for GitHub OAuth sign-in (no password needed)."""
     import secrets as _secrets
-    user = db.query(User).filter(User.email == body.email).first()
-    if user is None:
-        user = User(
-            email=body.email,
-            password_hash=_hash_password(_secrets.token_urlsafe(32)),
-            plan="free",
+    from sqlalchemy import text
+
+    # Use raw SQL selecting only core columns — safe even if github_* columns don't exist yet
+    row = db.execute(
+        text("SELECT id, email, plan FROM users WHERE email = :email"),
+        {"email": str(body.email)},
+    ).first()
+
+    if row is None:
+        user_id = str(__import__("uuid").uuid4())
+        db.execute(
+            text("INSERT INTO users (id, email, password_hash, plan) VALUES (:id, :email, :pw, 'free')"),
+            {"id": user_id, "email": str(body.email), "pw": _hash_password(_secrets.token_urlsafe(32))},
         )
-        db.add(user)
         db.commit()
-        db.refresh(user)
-    return AuthResponse(token=_create_token(str(user.id)), email=user.email, plan=user.plan)
+        return AuthResponse(token=_create_token(user_id), email=str(body.email), plan="free")
+
+    return AuthResponse(token=_create_token(str(row.id)), email=str(row.email), plan=str(row.plan))
 
 
 @router.post("/logout")

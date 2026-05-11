@@ -1,0 +1,41 @@
+# Environment files — never commit these
+.env
+.env.local
+.env.production
+.env*.local
+backend/.env
+
+# Database
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+.next/
+dashboard/.next/
+dashboard/node_modules/
+
+# Logs
+*.log
+backend_out.txt
+backend_err.txt
+dashboard_out.txt
+dashboard_err.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

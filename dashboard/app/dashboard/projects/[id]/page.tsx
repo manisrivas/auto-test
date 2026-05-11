@@ -119,42 +119,43 @@ export default function ProjectDetailPage() {
           )}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <TrendChart history={data.coverage.history} threshold={data.project.quality_gate_threshold} />
-            <ErrorList pushes={data.recent_pushes} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, overflow: "hidden" }}>
-              <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a" }}>Quality gate</span>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 12 }}>
+          <TrendChart history={data.coverage.history} threshold={data.project.quality_gate_threshold} />
+          {/* Quality gate — right column */}
+          <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a" }}>Quality gate</span>
+            </div>
+            <div style={{ padding: "24px 20px", textAlign: "center" }}>
+              <div style={{ fontSize: 56, fontWeight: 300, letterSpacing: "-4px", color: "#0a0a0a", lineHeight: 1 }}>
+                {data.coverage.current}<span style={{ fontSize: 20, fontWeight: 300, color: "#8a8a8a" }}>%</span>
               </div>
-              <div style={{ padding: "24px 20px", textAlign: "center" }}>
-                <div style={{ fontSize: 56, fontWeight: 300, letterSpacing: "-4px", color: "#0a0a0a", lineHeight: 1 }}>
-                  {data.coverage.current}<span style={{ fontSize: 20, fontWeight: 300, color: "#8a8a8a" }}>%</span>
-                </div>
-                <div style={{ margin: "10px 0" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: passed ? "#edf7f1" : "#fdf0ee", color: passed ? "#1a7a4a" : "#c0392b", fontSize: 11, fontWeight: 500, fontFamily: "DM Mono, monospace", padding: "5px 12px", borderRadius: 20, border: `1px solid ${passed ? "rgba(46,168,101,0.2)" : "rgba(192,57,43,0.2)"}` }}>
-                    <i className={passed ? "ti ti-shield-check" : "ti ti-shield-x"} style={{ fontSize: 12 }} />
-                    {passed ? "PASSED" : "FAILED"}
-                  </span>
-                </div>
-                <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 16, textAlign: "left" }}>
-                  {[
-                    { label: "Min coverage", value: `${data.coverage.current} ≥ ${data.project.quality_gate_threshold}`, ok: data.coverage.current >= data.project.quality_gate_threshold },
-                    { label: "Failed pushes", value: String(data.recent_pushes.filter(p => p.status === "failed").length), ok: data.recent_pushes.filter(p => p.status === "failed").length === 0 },
-                    { label: "Trend", value: data.coverage.trend === "up" ? "↑ improving" : data.coverage.trend === "down" ? "↓ declining" : "→ stable", ok: data.coverage.trend !== "down" },
-                  ].map((rule) => (
-                    <div key={rule.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", fontSize: 12 }}>
-                      <span style={{ color: "#8a8a8a" }}>{rule.label}</span>
-                      <span style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: rule.ok ? "#1a7a4a" : "#c0392b" }}>{rule.value} {rule.ok ? "✓" : "✗"}</span>
-                    </div>
-                  ))}
-                </div>
+              <div style={{ margin: "10px 0" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: passed ? "#edf7f1" : "#fdf0ee", color: passed ? "#1a7a4a" : "#c0392b", fontSize: 11, fontWeight: 500, fontFamily: "DM Mono, monospace", padding: "5px 12px", borderRadius: 20, border: `1px solid ${passed ? "rgba(46,168,101,0.2)" : "rgba(192,57,43,0.2)"}` }}>
+                  <i className={passed ? "ti ti-shield-check" : "ti ti-shield-x"} style={{ fontSize: 12 }} />
+                  {passed ? "PASSED" : "FAILED"}
+                </span>
+              </div>
+              <div style={{ marginTop: 16, borderTop: "1px solid rgba(0,0,0,0.07)", paddingTop: 16, textAlign: "left" }}>
+                {[
+                  { label: "Min coverage", value: `${data.coverage.current} ≥ ${data.project.quality_gate_threshold}`, ok: data.coverage.current >= data.project.quality_gate_threshold },
+                  { label: "Failed pushes", value: String(data.recent_pushes.filter(p => p.status === "failed").length), ok: data.recent_pushes.filter(p => p.status === "failed").length === 0 },
+                  { label: "Trend", value: data.coverage.trend === "up" ? "↑ improving" : data.coverage.trend === "down" ? "↓ declining" : "→ stable", ok: data.coverage.trend !== "down" },
+                ].map((rule) => (
+                  <div key={rule.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", fontSize: 12 }}>
+                    <span style={{ color: "#8a8a8a" }}>{rule.label}</span>
+                    <span style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: rule.ok ? "#1a7a4a" : "#c0392b" }}>{rule.value} {rule.ok ? "✓" : "✗"}</span>
+                  </div>
+                ))}
               </div>
             </div>
-            <AISuggestions suggestions={data.ai_suggestions} />
           </div>
+        </div>
+
+        {/* Full-width row: ErrorList + AI Insights side by side */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <ErrorList pushes={data.recent_pushes} />
+          <AISuggestions suggestions={data.ai_suggestions} />
         </div>
 
         <FunctionTable files={data.files} />

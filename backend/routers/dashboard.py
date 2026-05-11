@@ -42,11 +42,14 @@ def get_dashboard(
     file_coverage = _aggregate_file_coverage(db, str(project.id))
     low_coverage_files = [f["name"] for f in file_coverage if f["coverage"] < 60]
 
-    suggestions = get_ai_suggestions({
-        "name": project.name,
-        "coverage_percent": current_cov,
-        "low_coverage_files": low_coverage_files,
-    })
+    try:
+        suggestions = get_ai_suggestions({
+            "name": project.name,
+            "coverage_percent": current_cov,
+            "low_coverage_files": low_coverage_files,
+        })
+    except Exception:
+        suggestions = []
 
     return {
         "project": {

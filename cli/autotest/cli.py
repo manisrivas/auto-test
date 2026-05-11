@@ -115,24 +115,24 @@ def _full_scan(language: str) -> None:
         try:
             tests = generate_tests(language, batch)
         except RuntimeError as e:
-            print(f"\n  ✖  {e}\n")
-            sys.exit(1)
+            print(f"\n  Warning: {e}\n  Skipping test generation — quality scan will still run.\n")
+            break
         except Exception:
-            print("\n  ⚠  Test generation failed — skipping remaining batches.\n")
+            print("\n  Test generation failed — skipping remaining batches.\n")
             break
         if tests:
             results = run_tests(language, tests)
             all_results.extend(results)
 
-    if not all_results:
-        print("No tests generated.")
-        return
+    if all_results:
+        print_report(all_results)
 
-    print_report(all_results)
-
+    print("\nRunning code quality scan...")
     quality_checks = scan_quality_issues(language)
     if quality_checks:
         print(f"  {len(quality_checks)} code quality issue(s) found — details on dashboard.\n")
+    else:
+        print("  No quality issues found.\n")
 
     send_report(
         language=language,
@@ -142,6 +142,10 @@ def _full_scan(language: str) -> None:
         plan=_detect_plan(),
         quality_checks=quality_checks,
     )
+
+    if not all_results:
+        print("No test results to report (login to enable AI test generation).")
+        return
 
     total_gen = sum(r.tests_generated for r in all_results)
     total_pass = sum(r.tests_passed for r in all_results)

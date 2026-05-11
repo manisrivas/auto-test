@@ -13,9 +13,8 @@ def generate_tests(language: str, functions: List[FunctionInfo]) -> List[Generat
 
     token = get_token()
     if not token:
-        print("\n  Not logged in.")
-        print("  Run: autotest login\n")
-        print("  Sign up free at https://autotest.dev")
-        sys.exit(1)
+        print("\n  Not logged in — skipping test generation.")
+        print("  Run: autotest login  to enable AI test generation.\n")
+        return []
 
     return AutotestBackendProvider(token).generate_tests(language, functions)

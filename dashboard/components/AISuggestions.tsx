@@ -9,11 +9,10 @@ export default function AISuggestions({ suggestions }: AISuggestionsProps) {
 
   return (
     <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a", letterSpacing: "-0.2px", display: "flex", alignItems: "center", gap: 6 }}>
           <i className="ti ti-sparkles" style={{ fontSize: 13 }} /> AI insights
         </span>
-        <button style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", border: "none", background: "none", cursor: "pointer" }}>All insights →</button>
       </div>
       <div>
         {suggestions.map((s, i) => (

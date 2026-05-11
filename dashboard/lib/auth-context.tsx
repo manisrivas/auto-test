@@ -37,6 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status === "loading") return;
 
+    // Safety net: mark ready after 10s no matter what (Railway cold starts can be slow)
+    const timeout = setTimeout(() => {
+      setGitHubConnected(!!githubToken);
+      setGitHubConnectedUsername(githubUsername);
+      setReady(true);
+    }, 10000);
+
     async function resolve() {
       let resolvedToken = "";
 
@@ -60,16 +67,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setGitHubConnected(me.github_connected);
           setGitHubConnectedUsername(me.github_username ?? "");
         } catch {
-          // fall back to session-based detection
           setGitHubConnected(!!githubToken);
           setGitHubConnectedUsername(githubUsername);
         }
+      } else {
+        // No backend token — fall back to session to at least show GitHub connection state
+        setGitHubConnected(!!githubToken);
+        setGitHubConnectedUsername(githubUsername);
       }
 
+      clearTimeout(timeout);
       setReady(true);
     }
 
     resolve();
+
+    return () => clearTimeout(timeout);
   }, [status, sessionToken, email]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

@@ -79,7 +79,15 @@ def _run(language: str) -> None:
     total_pass = sum(r.tests_passed for r in results)
     coverage = int((total_pass / total_gen * 100) if total_gen > 0 else 0)
     if coverage < 80:
-        sys.exit(1)
+        print(f"\n  Coverage is {coverage}% — below the 80% quality gate.")
+        try:
+            answer = input("  Push anyway? [y/N]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            answer = "n"
+        if answer not in ("y", "yes"):
+            print("  Push cancelled. Fix the failing tests and try again.\n")
+            sys.exit(1)
+        print("  Pushing with low coverage — reported to dashboard.\n")
 
 
 def _full_scan(language: str) -> None:
@@ -129,6 +137,8 @@ def _full_scan(language: str) -> None:
     total_pass = sum(r.tests_passed for r in all_results)
     coverage = int((total_pass / total_gen * 100) if total_gen > 0 else 0)
     print(f"\nBaseline coverage: {coverage}%")
+    if coverage < 80:
+        print(f"  Below the 80% quality gate — dashboard will show this as a warning.")
 
 
 def _get_lang(args: List[str]) -> str:

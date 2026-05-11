@@ -1,14 +1,15 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getProjects, githubSignin, Project } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { getProjects, Project } from "@/lib/api";
+// token and email come from AuthContext via useAuth()
 import SetupGuide from "@/components/SetupGuide";
 import NewProjectPanel from "@/components/NewProjectPanel";
 
 export default function DashboardPage() {
-  const { data: session, status, update } = useSession();
+  const { token, email, ready } = useAuth();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,54 +17,20 @@ export default function DashboardPage() {
   const [showPanel, setShowPanel] = useState(false);
   const [newProject, setNewProject] = useState<Project | null>(null);
 
-  const rawToken = (session as { token?: string })?.token ?? "";
-  const email = session?.user?.email ?? "";
-
   useEffect(() => {
-    if (status === "loading") return;
-    if (status === "unauthenticated") { router.push("/login"); return; }
-
-    // If session exists but no backend token (GitHub OAuth — backend call may have failed)
-    // Try to get the backend token now using their email
-    async function load() {
-      let token = rawToken;
-
-      if (!token && email) {
-        try {
-          const data = await githubSignin(email);
-          token = data.token;
-          // Trigger session refresh so token persists
-          await update({ token: data.token, plan: data.plan });
-        } catch {
-          setError("Could not authenticate with backend. Please try logging in again.");
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (!token) { setLoading(false); return; }
-
-      try {
-        const list = await getProjects(token);
-        setProjects(list);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to load projects");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, rawToken]);
+    if (!ready) return;
+    if (!token) { setLoading(false); return; }
+    getProjects(token)
+      .then(setProjects)
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [ready, token]);
 
   function handleCreated(p: Project) {
     setProjects((prev) => [...prev, p]);
     setShowPanel(false);
     setNewProject(p);
   }
-
-  const token = rawToken;
 
   return (
     <>
@@ -88,12 +55,7 @@ export default function DashboardPage() {
         )}
 
         {showPanel && (
-          <NewProjectPanel
-            token={token}
-            email={email}
-            onCreated={handleCreated}
-            onCancel={() => setShowPanel(false)}
-          />
+          <NewProjectPanel onCreated={handleCreated} onCancel={() => setShowPanel(false)} />
         )}
 
         {newProject && (
@@ -104,7 +66,7 @@ export default function DashboardPage() {
           />
         )}
 
-        {loading ? (
+        {!ready || loading ? (
           <div style={{ fontFamily: "DM Mono, monospace", fontSize: 12, color: "#8a8a8a" }}>Loading…</div>
         ) : projects.length === 0 && !showPanel ? (
           <div style={{ background: "#fff", border: "1px dashed rgba(0,0,0,0.12)", borderRadius: 14, padding: "64px 32px", textAlign: "center" }}>
@@ -128,14 +90,14 @@ export default function DashboardPage() {
               <div
                 key={p.id}
                 onClick={() => router.push(`/dashboard/projects/${p.id}`)}
-                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: 20, cursor: "pointer", transition: "border-color 0.15s, box-shadow 0.15s" }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.15)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)"; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.07)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}
+                style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: 20, cursor: "pointer" }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.15)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(0,0,0,0.07)"; }}
               >
                 <div style={{ display: "flex", alignItems: "start", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <i className="ti ti-git-branch" style={{ fontSize: 14, color: "#8a8a8a" }} />
-                    <h3 style={{ fontSize: 14, fontWeight: 500, color: "#0a0a0a", letterSpacing: "-0.2px" }}>{p.name}</h3>
+                    <h3 style={{ fontSize: 14, fontWeight: 500, color: "#0a0a0a" }}>{p.name}</h3>
                   </div>
                   <i className="ti ti-chevron-right" style={{ color: "#c4c4c4", fontSize: 15 }} />
                 </div>

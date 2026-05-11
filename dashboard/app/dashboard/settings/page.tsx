@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PlanBadge from "@/components/PlanBadge";
 import { disconnectGitHub } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
+  const { token, email, githubUsername } = useAuth();
   const router = useRouter();
   const plan = (session?.user as { plan?: string })?.plan ?? "free";
-  const token = (session as { token?: string })?.token ?? "";
-  const githubUsername = (session as { githubUsername?: string })?.githubUsername ?? "";
   const githubConnected = !!githubUsername;
 
   const [disconnecting, setDisconnecting] = useState(false);
@@ -53,7 +53,7 @@ export default function SettingsPage() {
         {/* Account */}
         <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: "4px 20px" }}>
           <div style={{ fontFamily: "DM Mono, monospace", fontSize: 9, letterSpacing: "1.5px", textTransform: "uppercase", color: "#8a8a8a", paddingTop: 16, paddingBottom: 8 }}>Account</div>
-          {row("Email", <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12 }}>{session?.user?.email}</span>)}
+          {row("Email", <span style={{ fontFamily: "DM Mono, monospace", fontSize: 12 }}>{email || session?.user?.email}</span>)}
           {row("Plan", <PlanBadge plan={plan} />)}
           {row("Log out", (
             <button onClick={() => signOut({ callbackUrl: "/" })} style={{ fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b", background: "none", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 6, padding: "4px 12px", cursor: "pointer" }}>

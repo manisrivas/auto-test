@@ -3,17 +3,17 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { signIn } from "next-auth/react";
-import { connectRepo, createProject, storeGitHubToken, githubSignin, GitHubRepo, Project } from "@/lib/api";
+import { connectRepo, createProject, storeGitHubToken, GitHubRepo, Project } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 interface Props {
-  token: string;
-  email: string;
   onCreated: (project: Project) => void;
   onCancel: () => void;
 }
 
-export default function NewProjectPanel({ token, email, onCreated, onCancel }: Props) {
+export default function NewProjectPanel({ onCreated, onCancel }: Props) {
   const { data: session } = useSession();
+  const { token, email } = useAuth();
   const githubToken = (session as { githubToken?: string })?.githubToken ?? "";
   const githubUsername = (session as { githubUsername?: string })?.githubUsername ?? "";
 
@@ -54,19 +54,16 @@ export default function NewProjectPanel({ token, email, onCreated, onCancel }: P
       .finally(() => setReposLoading(false));
   }, [tab, githubToken]);
 
-  // Resolve backend token — use prop if available, otherwise call githubSignin
-  async function getToken(): Promise<string> {
-    if (token) return token;
-    if (!email) throw new Error("Not authenticated");
-    const data = await githubSignin(email);
-    return data.token;
+  function getToken(): string {
+    if (!token) throw new Error("Not authenticated — please log in again");
+    return token;
   }
 
   async function handleConnect(repo: GitHubRepo) {
     setConnecting(repo.full_name);
     setReposError("");
     try {
-      const activeToken = await getToken();
+      const activeToken = getToken();
       if (githubToken) {
         await storeGitHubToken(githubToken, githubUsername, activeToken).catch(() => {});
       }
@@ -90,7 +87,7 @@ export default function NewProjectPanel({ token, email, onCreated, onCancel }: P
     setCreating(true);
     setManualError("");
     try {
-      const activeToken = await getToken();
+      const activeToken = getToken();
       const p = await createProject(name.trim(), 80, activeToken);
       onCreated(p);
     } catch (e: unknown) {

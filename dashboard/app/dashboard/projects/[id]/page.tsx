@@ -1,9 +1,9 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getDashboard, getProjects, githubSignin, DashboardData } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { getDashboard, getProjects, DashboardData } from "@/lib/api";
 import TrendChart from "@/components/TrendChart";
 import FunctionTable from "@/components/FunctionTable";
 import ErrorList from "@/components/ErrorList";
@@ -23,7 +23,7 @@ function KpiCard({ label, value, delta, deltaUp, barPct, barColor }: {
         {delta}
       </div>
       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: "#e8e8e3" }}>
-        <div style={{ height: "100%", width: `${barPct}%`, background: barColor }} />
+        <div style={{ height: "100%", width: `${Math.min(barPct, 100)}%`, background: barColor }} />
       </div>
     </div>
   );
@@ -31,64 +31,36 @@ function KpiCard({ label, value, delta, deltaUp, barPct, barColor }: {
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: session, status } = useSession();
+  const { token, ready } = useAuth();
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
-  const [projectKey, setProjectKey] = useState<string>("");
+  const [projectKey, setProjectKey] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const rawToken = (session as { token?: string })?.token ?? "";
-  const email = session?.user?.email ?? "";
-
   useEffect(() => {
-    if (status === "loading" || !id) return;
-    if (status === "unauthenticated") { router.push("/login"); return; }
+    if (!ready || !id) return;
+    if (!token) { setLoading(false); setError("Not authenticated — please log in."); return; }
 
-    async function load() {
-      let token = rawToken;
-
-      if (!token && email) {
-        try {
-          const auth = await githubSignin(email);
-          token = auth.token;
-        } catch {
-          setError("Could not authenticate. Please log in again.");
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (!token) { setLoading(false); return; }
-
-      try {
-        const [dash, projects] = await Promise.all([
-          getDashboard(id, token),
-          getProjects(token),
-        ]);
+    Promise.all([getDashboard(id, token), getProjects(token)])
+      .then(([dash, projects]) => {
         setData(dash);
         const proj = projects.find((p) => p.id === id);
         if (proj) setProjectKey(proj.project_key);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Failed to load project");
-      } finally {
-        setLoading(false);
-      }
-    }
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [ready, token, id]);
 
-    load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, rawToken, id]);
-
-  if (loading) return (
+  if (!ready || loading) return (
     <div style={{ padding: 32, fontFamily: "DM Mono, monospace", fontSize: 12, color: "#8a8a8a" }}>Loading…</div>
   );
 
   if (error) return (
-    <div style={{ padding: 32 }}>
+    <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ background: "#fdf0ee", border: "1px solid rgba(192,57,43,0.2)", borderRadius: 10, padding: "12px 16px", fontFamily: "DM Mono, monospace", fontSize: 11, color: "#c0392b" }}>{error}</div>
-      <button onClick={() => router.push("/login")} style={{ marginTop: 12, fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#0a0a0a", background: "none", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, padding: "7px 14px", cursor: "pointer" }}>
-        Back to login
+      <button onClick={() => router.push("/dashboard")} style={{ alignSelf: "flex-start", fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "#0a0a0a", background: "none", border: "1px solid rgba(0,0,0,0.12)", borderRadius: 8, padding: "7px 14px", cursor: "pointer" }}>
+        ← Back to projects
       </button>
     </div>
   );
@@ -113,7 +85,6 @@ export default function ProjectDetailPage() {
       </div>
 
       <div style={{ padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
-
         {data.recent_pushes.length === 0 && projectKey && (
           <SetupGuide projectKey={projectKey} projectName={data.project.name} />
         )}
@@ -141,7 +112,7 @@ export default function ProjectDetailPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, overflow: "hidden" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
+              <div style={{ padding: "16px 20px", borderBottom: "1px solid rgba(0,0,0,0.07)" }}>
                 <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a" }}>Quality gate</span>
               </div>
               <div style={{ padding: "24px 20px", textAlign: "center" }}>
@@ -158,7 +129,7 @@ export default function ProjectDetailPage() {
                   {[
                     { label: "Min coverage", value: `${data.coverage.current} ≥ ${data.project.quality_gate_threshold}`, ok: data.coverage.current >= data.project.quality_gate_threshold },
                     { label: "Failed pushes", value: String(data.recent_pushes.filter(p => p.status === "failed").length), ok: data.recent_pushes.filter(p => p.status === "failed").length === 0 },
-                    { label: "Coverage trend", value: data.coverage.trend === "up" ? "↑ improving" : data.coverage.trend === "down" ? "↓ declining" : "→ stable", ok: data.coverage.trend !== "down" },
+                    { label: "Trend", value: data.coverage.trend === "up" ? "↑ improving" : data.coverage.trend === "down" ? "↓ declining" : "→ stable", ok: data.coverage.trend !== "down" },
                   ].map((rule) => (
                     <div key={rule.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 0", fontSize: 12 }}>
                       <span style={{ color: "#8a8a8a" }}>{rule.label}</span>

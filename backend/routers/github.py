@@ -130,7 +130,7 @@ def disconnect_github(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Remove stored GitHub token from the user account."""
+    """Remove stored GitHub token — projects are kept."""
     current_user.github_access_token = None
     current_user.github_username = None
     db.commit()

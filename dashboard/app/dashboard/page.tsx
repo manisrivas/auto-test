@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { getProjects, Project } from "@/lib/api";
-// token and email come from AuthContext via useAuth()
+import { getProjects, deleteProject, Project } from "@/lib/api";
 import SetupGuide from "@/components/SetupGuide";
 import NewProjectPanel from "@/components/NewProjectPanel";
 
@@ -16,6 +15,7 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const [showPanel, setShowPanel] = useState(false);
   const [newProject, setNewProject] = useState<Project | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -25,6 +25,20 @@ export default function DashboardPage() {
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [ready, token]);
+
+  async function handleDelete(e: React.MouseEvent, id: string) {
+    e.stopPropagation();
+    if (!confirm("Delete this project? All reports will be lost.")) return;
+    setDeletingId(id);
+    try {
+      await deleteProject(id, token);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch {
+      // silently ignore — project stays in list
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   function handleCreated(p: Project) {
     setProjects((prev) => [...prev, p]);
@@ -99,7 +113,16 @@ export default function DashboardPage() {
                     <i className="ti ti-git-branch" style={{ fontSize: 14, color: "#8a8a8a" }} />
                     <h3 style={{ fontSize: 14, fontWeight: 500, color: "#0a0a0a" }}>{p.name}</h3>
                   </div>
-                  <i className="ti ti-chevron-right" style={{ color: "#c4c4c4", fontSize: 15 }} />
+                  <button
+                    onClick={(e) => handleDelete(e, p.id)}
+                    disabled={deletingId === p.id}
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", color: "#c4c4c4", fontSize: 14, lineHeight: 1, borderRadius: 4 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "#c0392b")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "#c4c4c4")}
+                    title="Delete project"
+                  >
+                    <i className="ti ti-trash" style={{ fontSize: 13 }} />
+                  </button>
                 </div>
                 <div style={{ fontFamily: "DM Mono, monospace", fontSize: 10, color: "#8a8a8a", marginTop: 6 }}>{p.project_key}</div>
                 <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(0,0,0,0.07)", display: "flex", alignItems: "center", gap: 6 }}>

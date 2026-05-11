@@ -68,9 +68,9 @@ export default function SetupGuide({ projectKey, projectName, onDone }: Props) {
       </div>
 
       {/* Steps in a single row */}
-      <div style={{ padding: "14px 16px", display: "flex", gap: 12, overflowX: "auto" }}>
+      <div style={{ padding: "14px 16px", display: "flex", gap: 12 }}>
         {steps(projectKey, isNew).map((step, i) => (
-          <div key={i} style={{ flex: "0 0 200px", background: "#fafaf8", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "10px 12px" }}>
+          <div key={i} style={{ flex: 1, minWidth: 0, background: "#fafaf8", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "10px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
               <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#0a0a0a", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "DM Mono, monospace", fontSize: 9, flexShrink: 0 }}>{i + 1}</div>
               <span style={{ fontSize: 11, fontWeight: 600, color: "#0a0a0a" }}>{step.title}</span>

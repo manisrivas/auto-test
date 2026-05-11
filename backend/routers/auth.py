@@ -62,6 +62,7 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """FastAPI dependency — decode JWT and return the User row."""
+    from sqlalchemy import text as _text
     token = credentials.credentials
     try:
         payload = jwt.decode(token, _JWT_SECRET, algorithms=[_ALGORITHM])
@@ -71,9 +72,29 @@ def get_current_user(
 
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+
+    # Use raw SQL to avoid failures when optional columns don't exist yet
+    try:
+        row = db.execute(
+            _text("SELECT id, email, plan, github_access_token, github_username FROM users WHERE id = :id"),
+            {"id": user_id},
+        ).first()
+    except Exception:
+        # Fallback: query without github columns
+        row = db.execute(
+            _text("SELECT id, email, plan, NULL as github_access_token, NULL as github_username FROM users WHERE id = :id"),
+            {"id": user_id},
+        ).first()
+
+    if row is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    user = User()
+    user.id = row.id
+    user.email = row.email
+    user.plan = row.plan
+    user.github_access_token = row.github_access_token
+    user.github_username = row.github_username
     return user
 
 
